@@ -1,9 +1,9 @@
 from fastapi import FastAPI, Request # type: ignore
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
-from pydantic import BaseModel
-from urllib.parse import urlencode
 from src.utils.email_agent_setup import email_setup
 from src.agents.mail import respond_to_support_email
+from urllib.parse import urlencode
+from .routes.shopify import router as shopify_router
 
 # Load environment variables if .env present
 try:
@@ -28,9 +28,11 @@ async def startup_event():
     print("Starting up...")
     email_setup()
 
+app.include_router(shopify_router)
+
 @app.get("/")
 async def root():
-    return {"message": "Hello from Rockefeller API!"}
+    return {"message": "Hello from Rockefeller API!", "shopify": "/auth, /auth/callback, /api/*, /api/webhooks"}
 
 @app.get("/health")
 async def health_check():
