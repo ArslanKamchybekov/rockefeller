@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from agents.docs import generate_legal_docs
+from models.docs import LegalDocsInput, LegalDocsOutput
 
 app = FastAPI(title="Rockefeller API", version="1.0.0")
 
@@ -19,6 +21,11 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.post("/docs_search", response_model=LegalDocsOutput)
+async def docs_test(body: LegalDocsInput) -> LegalDocsOutput:
+    response: LegalDocsOutput = generate_legal_docs({ "idea": body.idea })
+    return response
 
 if __name__ == "__main__":
     import uvicorn
