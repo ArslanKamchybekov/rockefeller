@@ -1,5 +1,20 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+import os
+import hmac
+import hashlib
+import base64
+import httpx
+from urllib.parse import urlencode
+
+# Load environment variables if .env present
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
 
 app = FastAPI(title="Rockefeller API", version="1.0.0")
 
