@@ -41,7 +41,7 @@ const navigation = [
     title: 'Main',
     items: [
       { title: 'Dashboard', url: '/dashboard', icon: Home },
-      { title: 'AI Chat', url: '/chat', icon: MessageCircle },
+      { title: 'Chat', url: '/chat', icon: MessageCircle },
       { title: 'Analytics', url: '/analytics', icon: BarChart3 },
       { title: 'Reports', url: '/reports', icon: FileText },
     ],

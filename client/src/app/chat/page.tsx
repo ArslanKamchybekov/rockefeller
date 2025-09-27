@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { ToolCallProgress, ToolCall } from '@/components/ToolCallProgress';
 
 interface ChatProps {
   className?: string;
@@ -79,6 +80,7 @@ export default function ChatPage({ className }: ChatProps) {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [files, setFiles] = useState<FileList | undefined>(undefined);
+  const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -96,14 +98,110 @@ export default function ChatPage({ className }: ChatProps) {
     },
   }), []);
 
-  const { messages, sendMessage, status } = useChat({ transport });
+  // Build options as 'any' to allow onToolResult even if type definitions lag behind
+  const chatOptions: any = {
+    transport,
+    onToolCall: ({ toolCall }: any) => {
+      console.log('Tool call started:', { toolCall });
+      const { toolCallId, toolName } = toolCall;
+      // Add new tool call to state or update existing one
+      setToolCalls((prev) => {
+        const existingIndex = prev.findIndex((tc) => tc.id === toolCallId);
+        if (existingIndex >= 0) {
+          return prev.map((tc, index) =>
+            index === existingIndex
+              ? { ...tc, status: 'running' as const, startTime: Date.now() }
+              : tc
+          );
+        }
+        // Mark any currently running tool as completed before adding the next one
+        const progressed = prev.map((tc) =>
+          tc.status === 'running'
+            ? { ...tc, status: 'completed' as const, endTime: Date.now() }
+            : tc
+        );
+
+        const newToolCall: ToolCall = {
+          id: toolCallId || `tool-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          toolName,
+          status: 'running',
+          startTime: Date.now(),
+        };
+        return [...progressed, newToolCall];
+      });
+    },
+    onToolResult: ({ toolCallId, result }: any) => {
+      console.log('onToolResult received:', { toolCallId, result });
+      setToolCalls((prev) =>
+        prev.map((tc) =>
+          tc.id === toolCallId
+            ? { ...tc, status: 'completed' as const, result, endTime: Date.now() }
+            : tc
+        )
+      );
+    },
+    onError: (error: any) => {
+      console.error('Chat error:', error);
+      setToolCalls((prev) =>
+        prev.map((tc) =>
+          tc.status === 'running'
+            ? { ...tc, status: 'error' as const, endTime: Date.now() }
+            : tc
+        )
+      );
+    },
+  };
+
+  const { messages, sendMessage, status } = useChat(chatOptions);
 
   // Reset thinking state when status changes
   useEffect(() => {
     if (status === 'ready') {
       setIsThinking(false);
+      // Ensure any remaining running tool (usually the last one) is marked completed
+      setToolCalls((prev) =>
+        prev.map((tc) =>
+          tc.status === 'running'
+            ? { ...tc, status: 'completed' as const, endTime: Date.now() }
+            : tc
+        )
+      );
     }
   }, [status]);
+
+  // Clear tool calls when starting a new conversation
+  useEffect(() => {
+    if (messages.length === 0) {
+      setToolCalls([]);
+    }
+  }, [messages.length]);
+
+  // Debug tool calls state changes
+  useEffect(() => {
+    console.log('Tool calls state updated:', toolCalls);
+  }, [toolCalls]);
+
+  // Track processed tool results to avoid duplicate updates
+  const processedToolResultsRef = useRef<Set<string>>(new Set());
+
+  // Monitor messages for tool call completions (per tool) by scanning parts as they arrive
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last) return;
+    const parts = (last as any).parts || [];
+    parts.forEach((part: any) => {
+      if (part?.type === 'tool-result' && part.toolCallId && !processedToolResultsRef.current.has(part.toolCallId)) {
+        processedToolResultsRef.current.add(part.toolCallId);
+        setToolCalls((prev) =>
+          prev.map((tc) =>
+            tc.id === part.toolCallId
+              ? { ...tc, status: 'completed' as const, result: part.result, endTime: Date.now() }
+              : tc
+          )
+        );
+      }
+    });
+  }, [messages]);
 
   // Auto-scroll to bottom when messages change or streaming
   useEffect(() => {
@@ -141,9 +239,27 @@ export default function ChatPage({ className }: ChatProps) {
               <h1 className="text-3xl font-bold text-gray-900 mb-3">
                 How can I help you today?
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className="text-gray-600 text-lg mb-6">
                 Ask me anything about your business, data analysis, or get general assistance.
               </p>
+              
+              {/* Example prompts for tool calling */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl mx-auto">
+                <button
+                  onClick={() => setInput("Set up a new Shopify store called 'My Fashion Store' and generate all the legal documents")}
+                  className="p-3 text-left bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="font-medium text-gray-900">🏪 Set up a store</div>
+                  <div className="text-sm text-gray-600">Create store + generate docs</div>
+                </button>
+                <button
+                  onClick={() => setInput("Create a complete e-commerce setup with inventory and payment configuration")}
+                  className="p-3 text-left bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="font-medium text-gray-900">🛒 Full setup</div>
+                  <div className="text-sm text-gray-600">Store + docs + payments + inventory</div>
+                </button>
+              </div>
             </div>
 
             {/* Chat Input Container */}
@@ -260,7 +376,7 @@ export default function ChatPage({ className }: ChatProps) {
                   )}
                 >
                   {(message.parts ?? []).map((part: { type: string; text?: string }, i: number) => {
-                    if (part?.type !== 'text') return null;
+                    if (part?.type !== 'text') return <React.Fragment key={i}></React.Fragment>;
                     const text = (part as { type: 'text'; text: string }).text;
                     return message.role === 'user' ? (
                       <p key={i} className="text-sm whitespace-pre-wrap">{text}</p>
@@ -273,8 +389,17 @@ export default function ChatPage({ className }: ChatProps) {
               </div>
             ))}
 
+            {/* Tool Call Progress */}
+            {toolCalls.length > 0 && (
+              <div className="flex gap-3 justify-start">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 max-w-[80%]">
+                  <ToolCallProgress toolCalls={toolCalls} />
+                </div>
+              </div>
+            )}
+
             {/* Thinking/Loading Indicator */}
-            {(isThinking || status === 'streaming') && (
+            {(isThinking || status === 'streaming') && toolCalls.length === 0 && (
               <div className="flex gap-3 justify-start">
                 <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
                   <div className="flex items-center gap-2">
