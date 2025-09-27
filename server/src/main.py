@@ -38,6 +38,11 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
+@app.post("/docs_search", response_model=LegalDocsOutput)
+async def docs_test(body: LegalDocsInput) -> LegalDocsOutput:
+    response: LegalDocsOutput = generate_legal_docs({ "idea": body.idea })
+    return response
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

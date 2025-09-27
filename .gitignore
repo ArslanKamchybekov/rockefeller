@@ -1,0 +1,8 @@
+/.vscode
+/env
+.env
+.env.*
+*.env
+/server/venv
+!.env.example
+*.pyc
