@@ -7,6 +7,7 @@ import hashlib
 import base64
 import httpx
 from urllib.parse import urlencode
+from .models.docs import LegalDocsInput, LegalDocsOutput
 
 # Load environment variables if .env present
 try:
