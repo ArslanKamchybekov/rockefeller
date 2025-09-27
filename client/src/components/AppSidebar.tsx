@@ -29,7 +29,9 @@ import {
   FileText, 
   HelpCircle,
   LogOut,
-  ChevronUp
+  ChevronUp,
+  Plug,
+  MessageCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -39,8 +41,15 @@ const navigation = [
     title: 'Main',
     items: [
       { title: 'Dashboard', url: '/dashboard', icon: Home },
+      { title: 'AI Chat', url: '/chat', icon: MessageCircle },
       { title: 'Analytics', url: '/analytics', icon: BarChart3 },
       { title: 'Reports', url: '/reports', icon: FileText },
+    ],
+  },
+  {
+    title: 'Integrations',
+    items: [
+      { title: 'Connect Apps', url: '/integrations', icon: Plug },
     ],
   },
   {
@@ -63,20 +72,20 @@ export function AppSidebar() {
   }
 
   return (
-    <Sidebar className="border-green-200">
-      <SidebarHeader className="border-b border-green-100">
+    <Sidebar className="border-gray-200">
+      <SidebarHeader className="border-b border-gray-100">
         <div className="flex items-center gap-2 px-4 py-2">
-          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-sm">R</span>
           </div>
-          <span className="font-semibold text-green-800">Rockefeller</span>
+          <span className="font-semibold text-gray-900">Rockefeller</span>
         </div>
       </SidebarHeader>
       
       <SidebarContent>
         {navigation.map((group) => (
           <SidebarGroup key={group.title}>
-            <SidebarGroupLabel className="text-green-700">{group.title}</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-gray-700">{group.title}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => (
@@ -84,7 +93,7 @@ export function AppSidebar() {
                     <SidebarMenuButton
                       asChild
                       isActive={pathname === item.url}
-                      className="data-[active=true]:bg-green-100 data-[active=true]:text-green-800 hover:bg-green-50 hover:text-green-700"
+                      className="data-[active=true]:bg-gray-100 data-[active=true]:text-gray-800 hover:bg-gray-50 hover:text-gray-700"
                     >
                       <Link href={item.url}>
                         <item.icon className="w-4 h-4" />
@@ -99,22 +108,22 @@ export function AppSidebar() {
         ))}
       </SidebarContent>
       
-      <SidebarFooter className="border-t border-green-100">
+      <SidebarFooter className="border-t border-gray-100">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <SidebarMenuButton className="hover:bg-green-50">
+                <SidebarMenuButton className="hover:bg-gray-50">
                   <Avatar className="w-6 h-6">
-                    <AvatarFallback className="bg-green-100 text-green-700 text-xs">
+                    <AvatarFallback className="bg-gray-100 text-gray-700 text-xs">
                       {getUserInitials(user?.email)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col items-start text-left">
-                    <span className="text-sm font-medium text-green-800 truncate max-w-[120px]">
+                    <span className="text-sm font-medium text-gray-900 truncate max-w-[120px]">
                       {user?.email?.split('@')[0] || 'User'}
                     </span>
-                    <span className="text-xs text-green-600 truncate max-w-[120px]">
+                    <span className="text-xs text-gray-600 truncate max-w-[120px]">
                       {user?.email}
                     </span>
                   </div>

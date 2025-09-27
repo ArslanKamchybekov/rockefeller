@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel
 import os
 import hmac
 import hashlib
@@ -27,9 +26,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from .routes.shopify import router as shopify_router
+
+app.include_router(shopify_router)
+
 @app.get("/")
 async def root():
-    return {"message": "Hello from Rockefeller API!"}
+    return {"message": "Hello from Rockefeller API!", "shopify": "/auth, /auth/callback, /api/*, /api/webhooks"}
 
 @app.get("/health")
 async def health_check():
