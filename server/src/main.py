@@ -1,13 +1,9 @@
-from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, Request # type: ignore
+from fastapi.middleware.cors import CORSMiddleware # type: ignore
 from pydantic import BaseModel
-import os
-import hmac
-import hashlib
-import base64
-import httpx
 from urllib.parse import urlencode
+from src.utils.email_agent_setup import email_setup
+from src.agents.mail import respond_to_support_email
 
 # Load environment variables if .env present
 try:
@@ -27,6 +23,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    print("Starting up...")
+    email_setup()
+
 @app.get("/")
 async def root():
     return {"message": "Hello from Rockefeller API!"}
@@ -35,11 +36,12 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-@app.post("/docs_search", response_model=LegalDocsOutput)
-async def docs_test(body: LegalDocsInput) -> LegalDocsOutput:
-    response: LegalDocsOutput = generate_legal_docs({ "idea": body.idea })
-    return response
+@app.post("/email/webhook")
+async def email_webhook(request: Request):
+    body = await request.body()
+    respond_to_support_email(body)
+    return {"status": "received"}
 
 if __name__ == "__main__":
-    import uvicorn
+    import uvicorn # type: ignore
     uvicorn.run(app, host="0.0.0.0", port=8000)
