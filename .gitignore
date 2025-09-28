@@ -6,3 +6,6 @@
 /server/venv
 !.env.example
 *.pyc
+branding_video.mp4
+*.venv
+*__pycache__

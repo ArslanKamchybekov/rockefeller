@@ -6,6 +6,7 @@ import hashlib
 import httpx
 from urllib.parse import urlencode
 import dotenv
+from typing import Optional
 
 router = APIRouter(prefix="", tags=["shopify"])
 
@@ -36,7 +37,7 @@ def verify_hmac(query_params: dict) -> bool:
 
 
 @router.get("/auth")
-async def shopify_oauth_start(shop: str, host: str | None = None):
+async def shopify_oauth_start(shop: str, host: Optional[str] = None):
     """Redirect merchant to Shopify OAuth install screen."""
     # Clean shop parameter - remove https:// if present
     if shop.startswith("https://"):
@@ -59,7 +60,7 @@ async def shopify_oauth_start(shop: str, host: str | None = None):
 
 
 @router.get("/auth/callback")
-async def shopify_oauth_callback(request: Request, shop: str, code: str, state: str | None = None, hmac: str | None = None):
+async def shopify_oauth_callback(request: Request, shop: str, code: str, state: Optional[str] = None, hmac: Optional[str] = None):
     """Exchange code for a permanent access token."""
     print(f"OAuth callback received: shop={shop}, code={code[:10]}..., hmac={hmac}")
     
