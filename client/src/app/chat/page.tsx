@@ -96,7 +96,6 @@ export default function ChatPage({ className }: ChatProps) {
       api: '/api/chat',
       fetch: async (url, init) => {
         const body = JSON.parse((init?.body as string) || '{}');
-        console.log('Transport fetch called with userId:', user?.id);
         return fetch(url, {
           ...init,
           body: JSON.stringify({
@@ -146,6 +145,12 @@ export default function ChatPage({ className }: ChatProps) {
       if (!toolCallId || !payload) {
         return;
       }
+      
+      // Debug logging for legal docs
+      if (payload?.docs) {
+        console.log('Legal docs tool result:', payload);
+      }
+      
       // No direct state write for docs; we render from typed tool parts in messages
       setToolCalls((prev) => {
         const updated = prev.map((tc) =>
@@ -518,6 +523,7 @@ export default function ChatPage({ className }: ChatProps) {
                       }
                       case 'tool-generateLegalDocs': {
                         const callId = part.toolCallId;
+                        console.log('Legal docs tool part:', part);
                         switch (part.state) {
                           case 'input-streaming':
                             return <div key={callId} className="text-sm text-gray-600">Preparing legal docs...</div>;
@@ -525,10 +531,16 @@ export default function ChatPage({ className }: ChatProps) {
                             return <div key={callId} className="text-sm text-gray-700">Generating legal documents...</div>;
                           case 'output-available': {
                             const docs = part.output?.docs || part.output?.output?.docs || [];
-                            if (!Array.isArray(docs) || docs.length === 0) return null;
+                            const pdfs = part.output?.pdfs || part.output?.output?.pdfs || [];
+                            console.log('Legal docs output:', docs);
+                            console.log('Legal docs PDFs:', pdfs);
+                            if (!Array.isArray(docs) || docs.length === 0) {
+                              console.log('No docs found in output');
+                              return null;
+                            }
                             return (
                               <div key={callId} className="mt-2">
-                                <LegalDocsDisplay docs={docs} />
+                                <LegalDocsDisplay docs={docs} pdfs={pdfs} />
                               </div>
                             );
                           }

@@ -10,8 +10,6 @@ export async function POST(req: Request) {
   try {
     const { messages, userId }: { messages: UIMessage[], userId?: string } = await req.json();
 
-    console.log('userId', userId);
-
     const result = streamText({
       model: google('gemini-2.5-flash'),
       system: `You are an AI assistant that helps users set up e-commerce stores and manage business workflows. 
@@ -128,27 +126,37 @@ When creating products with images:
                 // Clean the response - remove markdown code blocks if present
                 let cleanedDocs = result.docs.trim();
                 
-                // Remove markdown code block markers
-                if (cleanedDocs.startsWith('```json')) {
-                  cleanedDocs = cleanedDocs.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-                } else if (cleanedDocs.startsWith('```')) {
-                  cleanedDocs = cleanedDocs.replace(/^```\s*/, '').replace(/\s*```$/, '');
+                // Remove markdown code block markers more aggressively
+                cleanedDocs = cleanedDocs.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+                cleanedDocs = cleanedDocs.replace(/^```\s*/, '').replace(/\s*```$/, '');
+                
+                // Remove any leading/trailing backticks or whitespace
+                cleanedDocs = cleanedDocs.replace(/^`+|`+$/g, '').trim();
+                
+                // Find the JSON array within the response
+                const jsonStart = cleanedDocs.indexOf('[');
+                const jsonEnd = cleanedDocs.lastIndexOf(']') + 1;
+                
+                if (jsonStart === -1 || jsonEnd === 0) {
+                  throw new Error('No JSON array found in response');
                 }
                 
-                // Remove any leading/trailing backticks
-                cleanedDocs = cleanedDocs.replace(/^`+|`+$/g, '');
+                const jsonString = cleanedDocs.substring(jsonStart, jsonEnd);
                 
                 // Validate that we have a valid JSON array
-                if (!cleanedDocs.startsWith('[') && !cleanedDocs.startsWith('{')) {
-                  throw new Error('Response is not valid JSON');
+                if (!jsonString.startsWith('[')) {
+                  throw new Error('Response is not valid JSON array');
                 }
                 
-                parsedDocs = JSON.parse(cleanedDocs);
+                console.log('Parsing JSON string:', jsonString.substring(0, 200) + '...');
+                parsedDocs = JSON.parse(jsonString);
                 
                 // Ensure it's an array
                 if (!Array.isArray(parsedDocs)) {
                   throw new Error('Response is not a JSON array');
                 }
+                
+                console.log('Successfully parsed', parsedDocs.length, 'documents');
               } catch (parseError) {
                 console.error('Error parsing legal docs JSON:', parseError);
                 console.error('Raw response:', result.docs);
@@ -173,6 +181,7 @@ When creating products with images:
                 success: true,
                 status: "done", 
                 docs: formattedDocs,
+                pdfs: result.pdfs || [],
                 message: `Generated ${formattedDocs.length} legal documents for: ${idea}`
               };
             } catch (error) {
