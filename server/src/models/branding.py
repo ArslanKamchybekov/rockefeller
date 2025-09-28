@@ -1,9 +1,10 @@
 from pydantic import BaseModel
 
 class BrandingInfoInput (BaseModel):
-    marketData: str
+    idea_string : str
 
 class BrandingInfosOutput (BaseModel):
-   businessData : {image : image,
-                    name : name,
-                    slogan : slogan}
+    branding : dict 
+
+class BrandingInfoVideoOutput (BaseModel):
+    video : bytes
