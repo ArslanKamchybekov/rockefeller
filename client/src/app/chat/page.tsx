@@ -549,6 +549,37 @@ export default function ChatPage({ className }: ChatProps) {
                         }
                         return null;
                       }
+                      case 'tool-phoneassistant': {
+                        const callId = part.toolCallId;
+                        switch (part.state) {
+                          case 'input-streaming':
+                            return <div key={callId} className="text-sm text-gray-600">Setting up phone assistant...</div>;
+                          case 'input-available':
+                            return <div key={callId} className="text-sm text-gray-700">Configuring phone assistant...</div>;
+                          case 'output-available': {
+                            const result = part.output || part.output?.output || {};
+                            return (
+                              <div key={callId} className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <span className="text-sm font-medium text-blue-900">Phone Assistant Ready</span>
+                                </div>
+                                <div className="text-sm text-blue-800 mb-2">
+                                  {result.message || 'Your customer phone assistant is ready!'}
+                                </div>
+                                {result.phone_number && (
+                                  <div className="text-lg font-mono text-blue-900 bg-white px-3 py-2 rounded border border-blue-300">
+                                    📞 {result.phone_number}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+                          case 'output-error':
+                            return <div key={callId} className="text-sm text-red-600">{part.errorText || 'Failed to set up phone assistant.'}</div>;
+                        }
+                        return null;
+                      }
                       case 'dynamic-tool': {
                         const callId = part.toolCallId || i;
                         if (part.toolName === 'generateLegalDocs') {
@@ -568,6 +599,35 @@ export default function ChatPage({ className }: ChatProps) {
                             }
                             case 'output-error':
                               return <div key={callId} className="text-sm text-red-600">{part.errorText || 'Failed to generate legal documents.'}</div>;
+                          }
+                        }
+                        if (part.toolName === 'phoneassistant') {
+                          switch (part.state) {
+                            case 'input-streaming':
+                              return <div key={callId} className="text-sm text-gray-600">Setting up phone assistant...</div>;
+                            case 'input-available':
+                              return <div key={callId} className="text-sm text-gray-700">Configuring phone assistant...</div>;
+                            case 'output-available': {
+                              const result = part.output || part.output?.output || {};
+                              return (
+                                <div key={callId} className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    <span className="text-sm font-medium text-blue-900">Phone Assistant Ready</span>
+                                  </div>
+                                  <div className="text-sm text-blue-800 mb-2">
+                                    {result.message || 'Your customer phone assistant is ready!'}
+                                  </div>
+                                  {result.phone_number && (
+                                    <div className="text-lg font-mono text-blue-900 bg-white px-3 py-2 rounded border border-blue-300">
+                                      📞 {result.phone_number}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            case 'output-error':
+                              return <div key={callId} className="text-sm text-red-600">{part.errorText || 'Failed to set up phone assistant.'}</div>;
                           }
                         }
                         return null;

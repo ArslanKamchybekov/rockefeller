@@ -34,6 +34,7 @@ const getToolDisplayName = (toolName: string) => {
     generateBrandingVideo: 'Generating branding video',
     storeLink: 'Store link ready',
     mailSetup: 'Setting up assistant inbox',
+    phoneassistant: 'Setting up phone assistant',
     influencerSearch: 'Finding influencers',
   }
   return displayNames[toolName] || toolName
@@ -55,6 +56,7 @@ const getToolDescription = (toolName: string) => {
     generateBrandingVideo: 'Generating promotional video content for your brand',
     storeLink: 'Surface the link to your created store',
     mailSetup: 'Setting up the customer assistant inbox',
+    phoneassistant: 'Setting up your customer phone assistant',
     influencerSearch: 'Recommending accessible influencers (micro/mid-tier)',
   }
   return descriptions[toolName] || 'Processing your request...'
@@ -299,6 +301,18 @@ export function ToolCallProgress({ toolCalls, className }: ToolCallProgressProps
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">Assistant Inbox</div>
                         <div className="text-xs text-gray-600 truncate">{toolCall.result?.message || 'Inbox is being set up.'}</div>
+                      </div>
+                    </div>
+                  ) : toolCall.toolName === 'phoneassistant' ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">Phone Assistant</div>
+                        <div className="text-xs text-gray-600 truncate">{toolCall.result?.message || 'Phone assistant is being set up.'}</div>
+                        {toolCall.result?.phone_number && (
+                          <div className="mt-1 text-sm font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded border">
+                            {toolCall.result.phone_number}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : toolCall.toolName === 'influencerSearch' ? (

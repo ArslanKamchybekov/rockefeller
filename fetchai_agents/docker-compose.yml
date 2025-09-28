@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  fetchai-agents:
+    build: .
+    ports:
+      - "8001:8001"  # Market Research Agent
+      - "8002:8002"  # Branding Agent
+      - "8003:8003"  # Shopify Agent
+      - "8004:8004"  # Ads Agent
+      - "8005:8005"  # Legal Docs Agent
+      - "8006:8006"  # Customer Service Agent
+      - "8007:8007"  # Influencer Agent
+      - "8008:8008"  # Pitch Deck Agent
+    environment:
+      - AGENTVERSE_API_KEY=${AGENTVERSE_API_KEY}
+      - PYTHONPATH=/app
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - agents-network
+
+networks:
+  agents-network:
+    driver: bridge
