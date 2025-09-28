@@ -29,10 +29,13 @@ async def generate_branding_video_asset(input: BrandingInfoInput):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating branding video: {str(e)}")
 
-VIDEO_PATH = "branding_video.mp4"
 @router.get("/video")
 def get_video():
-    return FileResponse(VIDEO_PATH, media_type="video/mp4")
+    return FileResponse("branding_video.mp4", media_type="video/mp4")
+
+@router.get("/logo")
+def get_photo():
+    return FileResponse("branding_photo.png", media_type="image/png")
     
 @router.get("/health")
 async def health_check():
