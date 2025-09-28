@@ -8,4 +8,5 @@ class BrandingInfosOutput (BaseModel):
     branding : dict 
 
 class BrandingInfoVideoOutput (BaseModel):
-    video : Any
+    video: Any
+    video_url: str | None = None

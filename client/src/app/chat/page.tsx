@@ -331,7 +331,7 @@ export default function ChatPage({ className }: ChatProps) {
       {!hasMessages ? (
         <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 overflow-y-auto">
           {/* Initial prompt area when no messages */}
-          <div className="w-full max-w-2xl mx-auto">
+          <div className="w-full max-w-2xl mx-auto mb-100">
             {/* Greeting */}
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-3">
@@ -347,15 +347,15 @@ export default function ChatPage({ className }: ChatProps) {
                   onClick={() => setInput("Set up a new Shopify store called 'My Fashion Store' and generate all the legal documents")}
                   className="p-3 text-left bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="font-medium text-gray-900">🏪 Set up a store</div>
-                  <div className="text-sm text-gray-600">Create store + generate docs</div>
+                  <div className="font-medium text-gray-900">Set up a store</div>
+                  <div className="text-sm text-gray-600">Products</div>
                 </button>
                 <button
                   onClick={() => setInput("Create a complete e-commerce setup with inventory and payment configuration")}
                   className="p-3 text-left bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  <div className="font-medium text-gray-900">🛒 Full setup</div>
-                  <div className="text-sm text-gray-600">Store + docs + payments + inventory</div>
+                  <div className="font-medium text-gray-900">Full setup</div>
+                  <div className="text-sm text-gray-600">Store + Docs + ADs + Video</div>
                 </button>
               </div>
             </div>

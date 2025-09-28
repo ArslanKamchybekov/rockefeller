@@ -4,8 +4,8 @@ import { streamText, convertToModelMessages, UIMessage, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { createServerClient } from '@/lib/supabase-server';
 
-// IMPORTANT! Set the runtime to edge
-export const runtime = 'edge';
+// Using Node.js runtime for better compatibility
+// export const runtime = 'edge';
 
 export async function POST(req: Request) {
   try {
@@ -780,9 +780,9 @@ Format as structured JSON with social links.`
                 influencerData += chunk;
               }
 
-              // Step 3: Deck Generator Agent
+              // Step 3: Deck Generator Agent using Gemini
               const deckContent = await streamText({
-                model: openai('gpt-4o'),
+                model: google('gemini-2.5-flash'),
                 messages: [{
                   role: 'user',
                   content: `Generate a comprehensive 10-slide pitch deck for this business idea: "${idea}"
@@ -807,11 +807,24 @@ Create slides for:
 
 Each slide should have:
 - Compelling headline
-- 3-4 bullet points
-- Key data points
+- 3-4 bullet points with specific data and insights
+- Key metrics and numbers from the research
 - Visual suggestions
+- Use the market research and influencer data to make it data-driven
 
-Format as structured JSON.`
+Format as structured JSON array with this exact structure:
+[
+  {
+    "title": "Slide Title",
+    "icon": "📊",
+    "content": [
+      "Bullet point 1 with specific data",
+      "Bullet point 2 with metrics",
+      "Bullet point 3 with insights",
+      "Bullet point 4 with call to action"
+    ]
+  }
+]`
                 }]
               });
 
@@ -847,14 +860,52 @@ Format as structured JSON with specific color codes and design recommendations.`
               // Build slides JSON from deckData
               let slides: any[] = [];
               try {
-                const start = deckData.indexOf('['); const end = deckData.lastIndexOf(']') + 1;
-                slides = JSON.parse(deckData.substring(start, end));
-              } catch {
-                slides = [{ title: idea, icon: '📊', content: ['Pitch deck generated.'] }];
+                // Clean the response - remove markdown code blocks if present
+                let cleanedDeck = deckData.trim();
+                if (cleanedDeck.startsWith('```json')) {
+                  cleanedDeck = cleanedDeck.replace('```json', '').replace('```', '').trim();
+                } else if (cleanedDeck.startsWith('```')) {
+                  cleanedDeck = cleanedDeck.replace('```', '').trim();
+                }
+                
+                // Find JSON array
+                const start = cleanedDeck.indexOf('[');
+                const end = cleanedDeck.lastIndexOf(']') + 1;
+                
+                if (start === -1 || end === 0) {
+                  throw new Error('No JSON array found in response');
+                }
+                
+                const jsonString = cleanedDeck.substring(start, end);
+                slides = JSON.parse(jsonString);
+                
+                // Ensure it's an array and has content
+                if (!Array.isArray(slides) || slides.length === 0) {
+                  throw new Error('Invalid slides array');
+                }
+                
+                // Validate each slide has required fields
+                slides = slides.map((slide, index) => ({
+                  title: slide.title || `Slide ${index + 1}`,
+                  icon: slide.icon || '📊',
+                  content: Array.isArray(slide.content) ? slide.content : [String(slide.content || 'Content not available')]
+                }));
+                
+              } catch (parseError) {
+                console.error('Error parsing pitch deck JSON:', parseError);
+                console.error('Raw deck data:', deckData);
+                // Fallback to basic slides
+                slides = [
+                  { title: idea, icon: '📊', content: ['Pitch deck generated with AI insights.'] },
+                  { title: 'Problem', icon: '🎯', content: ['Market need identified through research.'] },
+                  { title: 'Solution', icon: '💡', content: ['Innovative approach to address the problem.'] },
+                  { title: 'Market Opportunity', icon: '📈', content: ['Significant market potential identified.'] },
+                  { title: 'Business Model', icon: '💰', content: ['Sustainable revenue streams planned.'] }
+                ];
               }
 
-              // Export PDF via Next API and return a downloadable data URL
-              let deckPdfDataUrl: string | null = null;
+              // Export PDF via Next API and upload to Supabase Storage
+              let deckPdfUrl: string | null = null;
               const deckId = `deck_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
               try {
                 const pdfResp = await fetch('http://127.0.0.1:3000/api/pitchdeck/export', {
@@ -862,16 +913,34 @@ Format as structured JSON with specific color codes and design recommendations.`
                   body: JSON.stringify({ deckId, slides })
                 });
                 if (pdfResp.ok) {
-                  const buf = await pdfResp.arrayBuffer();
-                  const uint8 = new Uint8Array(buf);
+                  const pdfBuffer = await pdfResp.arrayBuffer();
+                  
+                  // Convert to base64 for upload
+                  const uint8 = new Uint8Array(pdfBuffer);
                   let binary = '';
-                  const chunkSize = 0x8000; // 32KB chunks to avoid stack overflow
+                  const chunkSize = 0x8000;
                   for (let i = 0; i < uint8.length; i += chunkSize) {
                     const chunk = uint8.subarray(i, i + chunkSize);
                     binary += String.fromCharCode.apply(null, Array.prototype.slice.call(chunk) as any);
                   }
                   const b64 = btoa(binary);
-                  deckPdfDataUrl = `data:application/pdf;base64,${b64}`;
+                  
+                  // Upload to Supabase Storage via upload API
+                  const uploadResp = await fetch('http://127.0.0.1:3000/api/pitchdeck/upload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                      pdfBuffer: b64, 
+                      fileName: `pitch-deck-${deckId}.pdf` 
+                    })
+                  });
+                  
+                  if (uploadResp.ok) {
+                    const uploadData = await uploadResp.json();
+                    deckPdfUrl = uploadData.pdf_url;
+                  } else {
+                    console.error('Error uploading pitch deck to Supabase');
+                  }
                 }
               } catch (e) {
                 console.error('Error exporting pitch deck PDF:', e);
@@ -886,8 +955,8 @@ Format as structured JSON with specific color codes and design recommendations.`
                 influencer_research: influencerData,
                 deck_content: deckData,
                 design_specs: designData,
-                pdf_data_url: deckPdfDataUrl,
-                message: `Generated comprehensive pitch deck for "${idea}" with market research and influencer strategy.${deckPdfDataUrl ? ' PDF ready to download.' : ''}`
+                pdf_url: deckPdfUrl,
+                message: `Generated comprehensive pitch deck for "${idea}" with market research and influencer strategy.${deckPdfUrl ? ` [Download PDF](${deckPdfUrl})` : ''}`
               };
             } catch (error) {
               console.error('Error generating pitch deck:', error);
@@ -919,11 +988,12 @@ Format as structured JSON with specific color codes and design recommendations.`
               }
               
               const data = await response.json();
+              const branding = data.branding || {};
               
               return {
                 success: true,
                 status: "done",
-                branding: data.branding,
+                branding,
                 message: `Successfully generated branding for "${idea}"`
               };
             } catch (error) {
@@ -956,34 +1026,13 @@ Format as structured JSON with specific color codes and design recommendations.`
               }
               
               const data = await response.json();
-
-              // Only fetch the video file when the API confirms generation
-              let videoDataUrl: string | null = null;
-              if (data?.video === true) {
-                try {
-                  const vidResp = await fetch('http://127.0.0.1:8000/api/branding/video');
-                  if (vidResp.ok) {
-                    const buf = await vidResp.arrayBuffer();
-                    const uint8 = new Uint8Array(buf);
-                    let binary = '';
-                    const chunkSize = 0x8000;
-                    for (let i = 0; i < uint8.length; i += chunkSize) {
-                      const chunk = uint8.subarray(i, i + chunkSize);
-                      binary += String.fromCharCode.apply(null, Array.prototype.slice.call(chunk) as any);
-                    }
-                    const b64 = btoa(binary);
-                    videoDataUrl = `data:video/mp4;base64,${b64}`;
-                  }
-                } catch (e) {
-                  console.error('Error fetching generated branding video:', e);
-                }
-              }
+              const videoUrl: string | null = data?.video_url ?? null;
 
               return {
                 success: true,
                 status: "done",
                 video: data.video === true,
-                video_data_url: videoDataUrl,
+                video_url: videoUrl,
                 message: `Successfully generated branding video for "${idea}"`
               };
             } catch (error) {

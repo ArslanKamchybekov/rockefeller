@@ -8,7 +8,7 @@ from weasyprint import HTML, CSS
 from weasyprint.text.fonts import FontConfiguration
 import markdown 
 
-def generate_legal_docs(input: LegalDocsInput) -> LegalDocsOutput:
+def generate_legal_docs(input_data: dict) -> dict:
     prompt = f"""
         You are a legal-docs drafting assistant for a simple online store MVP. 
 
@@ -33,14 +33,13 @@ def generate_legal_docs(input: LegalDocsInput) -> LegalDocsOutput:
         - Website Terms: license = 'limited, revocable, non-transferable'; liability_cap = 'amount paid in last 12 months'; arbitration = true; class_waiver = true.
 
         Now generate the output for this idea:
-        IDEA: {input['idea']}
+        IDEA: {input_data['idea']}
     """
     MODEL, client = create_gemini_client()
 
-    response = client.generate_content(
-        prompt = prompt,
+    response = client.models.generate_content(
         model=MODEL,
-        generation_config={"temperature": 0.3},
+        contents=prompt,
     )
 
     # Parse the JSON response

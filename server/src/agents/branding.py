@@ -5,6 +5,9 @@ import re
 import time
 import requests
 import base64
+import os
+import uuid
+from supabase import create_client, Client
 
 def generate_branding (idea_string: str) -> dict:
     """
@@ -56,7 +59,9 @@ def generate_branding (idea_string: str) -> dict:
         print("Generating logo...")
         client = create_openai_client()
 
-        image_prompt = f"Create a logo for a brand named '{result['brand_name']}' with the tagline '{result['tagline']}'. The logo should be modern and visually appealing."
+        image_prompt = f"""
+        Create a logo for a brand named '{result['brand_name']}' with the tagline '{result['tagline']}'. The logo should be modern and visually appealing. No text.
+        """
         image_response = client.images.generate(
             model="dall-e-2",
             prompt=image_prompt,
@@ -64,12 +69,47 @@ def generate_branding (idea_string: str) -> dict:
             size="1024x1024",
         )
 
-        image_data = image_response.data[0]    
+        image_url = image_response.data[0].url
+        
+        # Download the image from the URL
+        image_response_download = requests.get(image_url)
+        image_response_download.raise_for_status()
         
         with open("branding_photo.png", "wb") as f:
-            f.write(base64.b64decode(image_data))
+            f.write(image_response_download.content)
 
-        print("Generated logo!")
+        # Upload to Supabase Storage using service role key
+        try:
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            bucket_name = os.getenv("SUPABASE_BUCKET", "product_images")
+            if not supabase_url or not supabase_service_key:
+                raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars")
+
+            sb: Client = create_client(supabase_url, supabase_service_key)
+            object_key = f"logos/{result['brand_name'].strip().lower().replace(' ', '-')}-{uuid.uuid4().hex}.png"
+
+            # Upload bytes to Supabase Storage
+            upload_res = sb.storage.from_(bucket_name).upload(
+                path=object_key,
+                file=image_response_download.content,
+                file_options={"contentType": "image/png", "upsert": "true"},
+            )
+            # UploadResponse object doesn't have .get() method, check for errors differently
+            if hasattr(upload_res, 'error') and upload_res.error:
+                raise RuntimeError(upload_res.error)
+
+            # Get public URL
+            public = sb.storage.from_(bucket_name).get_public_url(object_key)
+            public_url = public.get("publicUrl") if isinstance(public, dict) else None
+            if not public_url:
+                # Fallback to generated URL pattern
+                public_url = f"{supabase_url}/storage/v1/object/public/{bucket_name}/{object_key}"
+            result["logo"] = public_url
+        except Exception as supa_e:
+            print(f"Error uploading logo to Supabase Storage: {supa_e}")
+
+        print("Generated logo and uploaded to Supabase Storage!")
 
         return { "branding": result }
     
@@ -113,9 +153,40 @@ def generate_branding_video(idea_string: str) -> dict:
             generated_video.video.save("branding_video.mp4")
         except Exception as dl_e:
             print(f"Error saving generated video: {dl_e}")
-            return { "video": False }
+            return { "video": False, "video_url": None }
 
-        return { "video": True }
+        # Upload saved video to Supabase Storage and return public URL
+        try:
+            supabase_url = os.getenv("SUPABASE_URL")
+            supabase_service_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            bucket_name = os.getenv("SUPABASE_BUCKET", "product_images")
+            if not supabase_url or not supabase_service_key:
+                raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars")
+
+            sb: Client = create_client(supabase_url, supabase_service_key)
+            safe_name = re.sub(r"[^a-z0-9-]", "-", idea_string.strip().lower().replace(" ", "-"))[:60]
+            object_key = f"videos/{safe_name}-{uuid.uuid4().hex}.mp4"
+
+            with open("branding_video.mp4", "rb") as vf:
+                video_bytes = vf.read()
+
+            upload_res = sb.storage.from_(bucket_name).upload(
+                path=object_key,
+                file=video_bytes,
+                file_options={"contentType": "video/mp4", "upsert": "true"},
+            )
+            if hasattr(upload_res, 'error') and upload_res.error:
+                raise RuntimeError(upload_res.error)
+
+            public = sb.storage.from_(bucket_name).get_public_url(object_key)
+            public_url = public.get("publicUrl") if isinstance(public, dict) else None
+            if not public_url:
+                public_url = f"{supabase_url}/storage/v1/object/public/{bucket_name}/{object_key}"
+
+            return { "video": True, "video_url": public_url }
+        except Exception as supa_e:
+            print(f"Error uploading video to Supabase Storage: {supa_e}")
+            return { "video": True, "video_url": None }
     except Exception as e:
         print(f"Error processing branding video: {e}")
         return { "video": False }

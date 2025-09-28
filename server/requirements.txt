@@ -67,3 +67,5 @@ webencodings==0.5.1
 websockets==15.0.1
 zipp==3.23.0
 zopfli==0.2.3.post1
+boto3==1.35.36
+supabase==2.10.0
