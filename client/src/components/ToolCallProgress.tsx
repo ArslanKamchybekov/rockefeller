@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { CheckCircle, Clock, Loader2, XCircle } from 'lucide-react'
+import { CheckCircle, Clock, Loader2, XCircle, Search, BarChart3, Globe, TrendingUp, FileText, Presentation } from 'lucide-react'
 
 export interface ToolCall {
   id: string
@@ -25,7 +25,10 @@ const getToolDisplayName = (toolName: string) => {
     generateLegalDocs: 'Generating comprehensive legal documents',
     addProduct: 'Adding product to your store',
     deleteProduct: 'Deleting product from your store',
-    deleteAllProducts: 'Deleting all products from your store'
+    deleteAllProducts: 'Deleting all products from your store',
+    webSearch: 'Searching the web',
+    marketSearch: 'Analyzing market data',
+    generatePitchDeck: 'Generating pitch deck'
   }
   return displayNames[toolName] || toolName
 }
@@ -38,9 +41,87 @@ const getToolDescription = (toolName: string) => {
     generateLegalDocs: 'Creating privacy policy, terms of use, and NDA documents',
     addProduct: 'Adding new product to your Shopify store',
     deleteProduct: 'Removing product from your Shopify store',
-    deleteAllProducts: 'Removing all products from your Shopify store'
+    deleteAllProducts: 'Removing all products from your Shopify store',
+    webSearch: 'Gathering real-time information from the web',
+    marketSearch: 'Researching competitors, trends, and market statistics',
+    generatePitchDeck: 'Creating comprehensive investor presentation with market research and financial models'
   }
   return descriptions[toolName] || 'Processing your request...'
+}
+
+const getToolIcon = (toolName: string) => {
+  const icons: Record<string, React.ReactNode> = {
+    setupStore: <Globe className="h-5 w-5" />,
+    configurePayment: <CheckCircle className="h-5 w-5" />,
+    setupInventory: <BarChart3 className="h-5 w-5" />,
+    generateLegalDocs: <CheckCircle className="h-5 w-5" />,
+    addProduct: <CheckCircle className="h-5 w-5" />,
+    deleteProduct: <XCircle className="h-5 w-5" />,
+    deleteAllProducts: <XCircle className="h-5 w-5" />,
+    webSearch: <Search className="h-5 w-5" />,
+    marketSearch: <TrendingUp className="h-5 w-5" />,
+    generatePitchDeck: <Presentation className="h-5 w-5" />
+  }
+  return icons[toolName] || <Loader2 className="h-5 w-5" />
+}
+
+const getProgressSteps = (toolName: string, duration: number) => {
+  if (toolName === 'marketSearch') {
+    const steps = [
+      { name: 'Gathering market data', threshold: 5000 },
+      { name: 'Analyzing competitors', threshold: 15000 },
+      { name: 'Researching trends', threshold: 25000 },
+      { name: 'Compiling insights', threshold: 35000 },
+      { name: 'Finalizing report', threshold: 45000 }
+    ]
+    
+    const currentStep = steps.find(step => duration < step.threshold) || steps[steps.length - 1]
+    const stepIndex = steps.findIndex(step => step === currentStep)
+    
+    return {
+      currentStep: currentStep.name,
+      progress: Math.min((stepIndex + 1) / steps.length * 100, 100),
+      steps
+    }
+  }
+  
+  if (toolName === 'webSearch') {
+    const steps = [
+      { name: 'Searching the web', threshold: 3000 },
+      { name: 'Analyzing results', threshold: 8000 },
+      { name: 'Compiling information', threshold: 15000 }
+    ]
+    
+    const currentStep = steps.find(step => duration < step.threshold) || steps[steps.length - 1]
+    const stepIndex = steps.findIndex(step => step === currentStep)
+    
+    return {
+      currentStep: currentStep.name,
+      progress: Math.min((stepIndex + 1) / steps.length * 100, 100),
+      steps
+    }
+  }
+  
+  if (toolName === 'generatePitchDeck') {
+    const steps = [
+      { name: 'Researching market', threshold: 8000 },
+      { name: 'Building financial model', threshold: 16000 },
+      { name: 'Generating slide content', threshold: 24000 },
+      { name: 'Creating design specs', threshold: 32000 },
+      { name: 'Finalizing presentation', threshold: 40000 }
+    ]
+    
+    const currentStep = steps.find(step => duration < step.threshold) || steps[steps.length - 1]
+    const stepIndex = steps.findIndex(step => step === currentStep)
+    
+    return {
+      currentStep: currentStep.name,
+      progress: Math.min((stepIndex + 1) / steps.length * 100, 100),
+      steps
+    }
+  }
+  
+  return null
 }
 
 export function ToolCallProgress({ toolCalls, className }: ToolCallProgressProps) {
@@ -57,34 +138,87 @@ export function ToolCallProgress({ toolCalls, className }: ToolCallProgressProps
           ? toolCall.endTime - toolCall.startTime
           : Date.now() - toolCall.startTime
 
+        const progressInfo = getProgressSteps(toolCall.toolName, duration)
+
         return (
           <div
             key={toolCall.id}
             className={cn(
-              "flex items-center gap-3 p-3 rounded-lg border transition-all",
+              "flex items-start gap-3 p-4 rounded-lg border transition-all",
               isRunning && "bg-blue-50 border-blue-200",
               isCompleted && "bg-green-50 border-green-200",
               isError && "bg-red-50 border-red-200"
             )}
           >
-            <div className="flex-shrink-0">
-              {isRunning && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
+            <div className="flex-shrink-0 mt-0.5">
+              {isRunning && (
+                <div className="relative">
+                  {getToolIcon(toolCall.toolName)}
+                  <Loader2 className="h-3 w-3 animate-spin text-blue-600 absolute -top-1 -right-1" />
+                </div>
+              )}
               {isCompleted && <CheckCircle className="h-5 w-5 text-green-600" />}
               {isError && <XCircle className="h-5 w-5 text-red-600" />}
             </div>
             
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mb-2">
                 <h4 className="text-sm font-medium text-gray-900 truncate">
                   {getToolDisplayName(toolCall.toolName)}
                 </h4>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
                   {Math.round(duration / 1000)}s
                 </span>
               </div>
+              
+              {isRunning && progressInfo && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-blue-600 font-medium">
+                      {progressInfo.currentStep}
+                    </span>
+                    <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                      <div 
+                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${progressInfo.progress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-gray-500">
+                      {Math.round(progressInfo.progress)}%
+                    </span>
+                  </div>
+                  
+                  <div className="flex gap-1">
+                    {progressInfo.steps.map((step, index) => (
+                      <div
+                        key={index}
+                        className={cn(
+                          "h-1 flex-1 rounded-full transition-colors",
+                          duration >= step.threshold 
+                            ? "bg-blue-600" 
+                            : "bg-gray-200"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               <p className="text-xs text-gray-600 mt-1">
                 {getToolDescription(toolCall.toolName)}
               </p>
+              
+              {isCompleted && toolCall.result && (
+                <div className="mt-2 p-2 bg-white rounded border text-xs text-gray-700">
+                  <span className="font-medium">Result:</span> {toolCall.result.message || 'Completed successfully'}
+                </div>
+              )}
+              
+              {isError && (
+                <div className="mt-2 p-2 bg-red-100 rounded border border-red-200 text-xs text-red-700">
+                  <span className="font-medium">Error:</span> {toolCall.result?.message || 'An error occurred'}
+                </div>
+              )}
             </div>
             
             <div className="flex-shrink-0">

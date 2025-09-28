@@ -51,14 +51,14 @@ const navigation = [
       { title: 'Connect Apps', url: '/integrations', icon: Plug },
     ],
   },
-  {
-    title: 'Account',
-    items: [
-      { title: 'Profile', url: '/profile', icon: User },
-      { title: 'Settings', url: '/settings', icon: Settings },
-      { title: 'Help', url: '/help', icon: HelpCircle },
-    ],
-  },
+  // {
+  //   title: 'Account',
+  //   items: [
+  //     { title: 'Profile', url: '/profile', icon: User },
+  //     { title: 'Settings', url: '/settings', icon: Settings },
+  //     { title: 'Help', url: '/help', icon: HelpCircle },
+  //   ],
+  // },
 ]
 
 export function AppSidebar() {
@@ -74,10 +74,7 @@ export function AppSidebar() {
     <Sidebar className="border-gray-200">
       <SidebarHeader className="border-b border-gray-100">
         <div className="flex items-center gap-2 px-4 py-2">
-          <div className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">R</span>
-          </div>
-          <span className="font-semibold text-gray-900">Rockefeller</span>
+          <img className='rounded-lg' src="/logo.png" alt="Rockefeller" width={64} height={64} />
         </div>
       </SidebarHeader>
       

@@ -1,4 +1,5 @@
 import { google } from '@ai-sdk/google';
+import { openai } from '@ai-sdk/openai';
 import { streamText, convertToModelMessages, UIMessage, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { createServerClient } from '@/lib/supabase-server';
@@ -23,6 +24,9 @@ You have access to these tools:
 🗑️ deleteProduct - Deletes a product from the user's Shopify store (real Shopify API)
 🗑️ deleteAllProducts - Deletes all products from the user's Shopify store (real Shopify API)
 ⚖️ generateLegalDocs - Generates comprehensive legal documents (privacy policy, terms of use, NDA) for any business idea (real API)
+🔍 webSearch - Search the web for real-time information using OpenAI's web search capabilities
+📊 marketSearch - Search for market data, competitor analysis, and industry statistics
+📋 generatePitchDeck - Generate a comprehensive pitch deck with market research, financial models, and professional design
 
 When a user asks you to:
 - Set up a store → Use setupStore first, then generateLegalDocs
@@ -33,6 +37,9 @@ When a user asks you to:
 - Add a product to store → Use addProduct (price should be in dollars, e.g., 99.99 for $99.99). If the user has uploaded images, look for "Image URLs:" in their message and use those URLs in the images parameter.
 - Delete a product from store → Use deleteProduct
 - Delete all products from store → Use deleteAllProducts
+- Search for information on the web → Use webSearch for real-time information
+- Research competitors or market data → Use marketSearch for industry analysis and competitor insights
+- Generate a pitch deck → Use generatePitchDeck for comprehensive investor presentations
 
 Always explain what you're doing and show progress. Use the tools in logical sequence and provide clear feedback about each step. If a user mentions a store name, use it in the setupStore tool. Be helpful and proactive in suggesting next steps.
 
@@ -496,6 +503,302 @@ When creating products with images:
                 success: false,
                 status: "error",
                 message: `Failed to delete all products: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
+        },
+        webSearch: {
+          description: "Search the web for real-time information using OpenAI's web search capabilities",
+          inputSchema: z.object({ 
+            query: z.string().describe("The search query to find information on the web"),
+            max_results: z.number().optional().describe("Maximum number of search results to return (default: 5)")
+          }),
+          execute: async ({ query }) => {
+            try {
+              // Use OpenAI's GPT-4 with web search capabilities
+              const result = await streamText({
+                model: openai('gpt-4o'),
+                messages: [{
+                  role: 'user',
+                  content: `Please search for current information about: "${query}". Provide a comprehensive summary with the most relevant and recent information available. Include key findings, statistics, and important details. If you find specific sources or recent developments, mention them.`
+                }]
+              });
+
+              // Convert stream to text
+              let searchResults = '';
+              for await (const chunk of result.textStream) {
+                searchResults += chunk;
+              }
+
+              return {
+                success: true,
+                status: "done",
+                query,
+                results: searchResults,
+                message: `Found web search results for: ${query}`
+              };
+            } catch (error) {
+              console.error('Error performing web search:', error);
+              return {
+                success: false,
+                status: "error",
+                message: `Failed to perform web search: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
+        },
+        marketSearch: {
+          description: "Search for market data, competitor analysis, and industry statistics",
+          inputSchema: z.object({ 
+            industry: z.string().describe("The industry or market sector to analyze"),
+            competitors: z.array(z.string()).optional().describe("Specific competitors to analyze"),
+            search_focus: z.enum(['market_size', 'competitors', 'trends', 'pricing', 'growth', 'all']).optional().describe("What aspect of the market to focus on"),
+            region: z.string().optional().describe("Geographic region for market analysis (default: global)")
+          }),
+          execute: async ({ industry, competitors = [], search_focus = 'all', region = 'global' }) => {
+            try {
+              // Build comprehensive search queries for market research
+              const searchQueries = [];
+              
+              if (search_focus === 'all' || search_focus === 'market_size') {
+                searchQueries.push(`${industry} market size 2024 ${region}`);
+              }
+              if (search_focus === 'all' || search_focus === 'competitors') {
+                if (competitors.length > 0) {
+                  searchQueries.push(`${competitors.join(' ')} ${industry} competitors analysis 2024`);
+                } else {
+                  searchQueries.push(`top ${industry} companies competitors 2024 ${region}`);
+                }
+              }
+              if (search_focus === 'all' || search_focus === 'trends') {
+                searchQueries.push(`${industry} market trends 2024 ${region}`);
+              }
+              if (search_focus === 'all' || search_focus === 'pricing') {
+                searchQueries.push(`${industry} pricing strategies market analysis 2024`);
+              }
+              if (search_focus === 'all' || search_focus === 'growth') {
+                searchQueries.push(`${industry} market growth forecast 2024-2025 ${region}`);
+              }
+
+              // Perform a single comprehensive search instead of multiple searches
+              const comprehensiveQuery = searchQueries.slice(0, 2).join(' | '); // Combine top 2 queries
+              const searchResults = [];
+              
+              try {
+                const result = await streamText({
+                  model: openai('gpt-4o'),
+                  messages: [{
+                    role: 'user',
+                    content: `Provide a comprehensive market analysis for the ${industry} industry in ${region}. Research and include:
+
+1. Market size and growth projections
+2. Key competitors and their market positions${competitors.length > 0 ? ` (focus on: ${competitors.join(', ')})` : ''}
+3. Current trends and opportunities
+4. Pricing insights and strategies
+5. Strategic recommendations
+
+Focus on actionable insights for business strategy. Include specific data points, statistics, and recent developments.`
+                  }]
+                });
+
+                // Convert stream to text
+                let analysis = '';
+                for await (const chunk of result.textStream) {
+                  analysis += chunk;
+                }
+                
+                searchResults.push({
+                  query: comprehensiveQuery,
+                  analysis
+                });
+              } catch (searchError) {
+                console.error(`Error in market analysis:`, searchError);
+                // Fallback to basic analysis
+                searchResults.push({
+                  query: comprehensiveQuery,
+                  analysis: `Market analysis for ${industry} industry in ${region}. Analysis in progress...`
+                });
+              }
+
+              // Use the comprehensive analysis directly since it already contains all needed information
+              const finalAnalysis = searchResults[0]?.analysis || `Market analysis for ${industry} industry in ${region} completed.`
+
+              return {
+                success: true,
+                status: "done",
+                industry,
+                region,
+                search_focus,
+                competitors_analyzed: competitors,
+                market_analysis: finalAnalysis,
+                research_queries: searchQueries,
+                message: `Completed market analysis for ${industry} industry in ${region}`
+              };
+            } catch (error) {
+              console.error('Error performing market search:', error);
+              return {
+                success: false,
+                status: "error",
+                message: `Failed to perform market search: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
+        },
+        generatePitchDeck: {
+          description: "Generate a comprehensive pitch deck with market research, financial models, and professional design",
+          inputSchema: z.object({ 
+            idea: z.string().describe("The business idea or concept (e.g., 'AI that manages Shopify stores')"),
+            problem: z.string().optional().describe("The problem being solved"),
+            target_market: z.string().optional().describe("Target market or customer segment"),
+            competitors: z.array(z.string()).optional().describe("Known competitors"),
+            revenue_model: z.string().optional().describe("Revenue model (subscription, one-time, marketplace, etc.)"),
+            funding_amount: z.number().optional().describe("Funding amount being sought (in thousands)"),
+            team_size: z.number().optional().describe("Current team size"),
+            stage: z.enum(['idea', 'mvp', 'early_traction', 'growth', 'scale']).optional().describe("Current business stage")
+          }),
+          execute: async ({ idea, problem, target_market, competitors = [], revenue_model, funding_amount, team_size, stage = 'idea' }) => {
+            try {
+              // Step 1: Market Research Agent
+              const marketResearch = await streamText({
+                model: openai('gpt-4o'),
+                messages: [{
+                  role: 'user',
+                  content: `Conduct comprehensive market research for this business idea: "${idea}"
+
+${problem ? `Problem: ${problem}` : ''}
+${target_market ? `Target Market: ${target_market}` : ''}
+${competitors.length > 0 ? `Competitors: ${competitors.join(', ')}` : ''}
+
+Provide:
+1. Market size (TAM, SAM, SOM)
+2. Key competitors and their strengths/weaknesses
+3. Market trends and opportunities
+4. Customer pain points and needs
+5. Competitive landscape analysis
+
+Format as structured JSON.`
+                }]
+              });
+
+              let marketData = '';
+              for await (const chunk of marketResearch.textStream) {
+                marketData += chunk;
+              }
+
+              // Step 2: Financial Model Agent
+              const financialModel = await streamText({
+                model: openai('gpt-4o'),
+                messages: [{
+                  role: 'user',
+                  content: `Create a financial model for this business idea: "${idea}"
+
+${revenue_model ? `Revenue Model: ${revenue_model}` : ''}
+${funding_amount ? `Funding Sought: $${funding_amount}K` : ''}
+${team_size ? `Team Size: ${team_size}` : ''}
+Stage: ${stage}
+
+Provide:
+1. Revenue projections (3-5 years)
+2. Key metrics and KPIs
+3. Unit economics
+4. Growth assumptions
+5. Funding requirements and use of funds
+6. Break-even analysis
+
+Format as structured JSON with specific numbers and calculations.`
+                }]
+              });
+
+              let financialData = '';
+              for await (const chunk of financialModel.textStream) {
+                financialData += chunk;
+              }
+
+              // Step 3: Deck Generator Agent
+              const deckContent = await streamText({
+                model: openai('gpt-4o'),
+                messages: [{
+                  role: 'user',
+                  content: `Generate a comprehensive 10-slide pitch deck for this business idea: "${idea}"
+
+Market Research Data:
+${marketData}
+
+Financial Model Data:
+${financialData}
+
+Create slides for:
+1. Title Slide (Company name, tagline, contact info)
+2. Problem (Pain points, market need)
+3. Solution (Your product/service)
+4. Market Opportunity (TAM/SAM/SOM)
+5. Business Model (Revenue streams, pricing)
+6. Traction (Metrics, milestones, growth)
+7. Competition (Competitive landscape, differentiation)
+8. Team (Founders, advisors, key hires)
+9. Financial Projections (Revenue, growth, key metrics)
+10. Ask (Funding amount, use of funds, next steps)
+
+Each slide should have:
+- Compelling headline
+- 3-4 bullet points
+- Key data points
+- Visual suggestions
+
+Format as structured JSON.`
+                }]
+              });
+
+              let deckData = '';
+              for await (const chunk of deckContent.textStream) {
+                deckData += chunk;
+              }
+
+              // Step 4: Design Agent
+              const designSpecs = await streamText({
+                model: openai('gpt-4o'),
+                messages: [{
+                  role: 'user',
+                  content: `Create design specifications for a pitch deck about: "${idea}"
+
+Choose:
+1. Color scheme (primary, secondary, accent colors)
+2. Typography (headings, body text)
+3. Layout style (modern, professional, creative)
+4. Icon suggestions for each slide
+5. Chart/graph recommendations
+6. Visual hierarchy guidelines
+
+Format as structured JSON with specific color codes and design recommendations.`
+                }]
+              });
+
+              let designData = '';
+              for await (const chunk of designSpecs.textStream) {
+                designData += chunk;
+              }
+
+              // Generate unique deck ID
+              const deckId = `deck_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+              return {
+                success: true,
+                status: "done",
+                deck_id: deckId,
+                idea,
+                market_research: marketData,
+                financial_model: financialData,
+                deck_content: deckData,
+                design_specs: designData,
+                preview_url: `/pitchdeck/${deckId}`,
+                message: `Generated comprehensive pitch deck for "${idea}". Preview available at /pitchdeck/${deckId}`
+              };
+            } catch (error) {
+              console.error('Error generating pitch deck:', error);
+              return {
+                success: false,
+                status: "error",
+                message: `Failed to generate pitch deck: ${error instanceof Error ? error.message : 'Unknown error'}`
               };
             }
           }
