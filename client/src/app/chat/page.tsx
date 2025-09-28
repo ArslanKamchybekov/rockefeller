@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ToolCallProgress, ToolCall } from '@/components/ToolCallProgress';
+import { LegalDocsDisplay } from '@/components/LegalDocsDisplay';
 
 interface ChatProps {
   className?: string;
@@ -102,7 +103,6 @@ export default function ChatPage({ className }: ChatProps) {
   const chatOptions: any = {
     transport,
     onToolCall: ({ toolCall }: any) => {
-      console.log('Tool call started:', { toolCall });
       const { toolCallId, toolName } = toolCall;
       // Add new tool call to state or update existing one
       setToolCalls((prev) => {
@@ -130,18 +130,23 @@ export default function ChatPage({ className }: ChatProps) {
         return [...progressed, newToolCall];
       });
     },
-    onToolResult: ({ toolCallId, result }: any) => {
-      console.log('onToolResult received:', { toolCallId, result });
-      setToolCalls((prev) =>
-        prev.map((tc) =>
+    onToolResult: (evt: any) => {
+      const { toolCallId } = evt || {};
+      const payload = evt?.result ?? evt?.output ?? evt?.toolResult?.output ?? evt?.toolResult ?? evt ?? null;
+      if (!toolCallId || !payload) {
+        return;
+      }
+      // No direct state write for docs; we render from typed tool parts in messages
+      setToolCalls((prev) => {
+        const updated = prev.map((tc) =>
           tc.id === toolCallId
-            ? { ...tc, status: 'completed' as const, result, endTime: Date.now() }
+            ? { ...tc, status: 'completed' as const, result: payload, endTime: Date.now() }
             : tc
-        )
-      );
+        );
+        return updated;
+      });
     },
-    onError: (error: any) => {
-      console.error('Chat error:', error);
+    onError: () => {
       setToolCalls((prev) =>
         prev.map((tc) =>
           tc.status === 'running'
@@ -152,7 +157,16 @@ export default function ChatPage({ className }: ChatProps) {
     },
   };
 
-  const { messages, sendMessage, status } = useChat(chatOptions);
+  const { messages, sendMessage, status } = useChat({
+    ...chatOptions,
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    async onToolCall({ toolCall }: any) {
+      // Preserve existing progress UI updates
+      chatOptions.onToolCall?.({ toolCall });
+      // For client-side tools requiring auto execution, add results here (none currently)
+      if (toolCall?.dynamic) return;
+    },
+  } as any);
 
   // Reset thinking state when status changes
   useEffect(() => {
@@ -176,32 +190,71 @@ export default function ChatPage({ className }: ChatProps) {
     }
   }, [messages.length]);
 
-  // Debug tool calls state changes
-  useEffect(() => {
-    console.log('Tool calls state updated:', toolCalls);
-  }, [toolCalls]);
 
   // Track processed tool results to avoid duplicate updates
   const processedToolResultsRef = useRef<Set<string>>(new Set());
 
   // Monitor messages for tool call completions (per tool) by scanning parts as they arrive
   useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (!last) return;
-    const parts = (last as any).parts || [];
-    parts.forEach((part: any) => {
-      if (part?.type === 'tool-result' && part.toolCallId && !processedToolResultsRef.current.has(part.toolCallId)) {
-        processedToolResultsRef.current.add(part.toolCallId);
-        setToolCalls((prev) =>
-          prev.map((tc) =>
-            tc.id === part.toolCallId
-              ? { ...tc, status: 'completed' as const, result: part.result, endTime: Date.now() }
-              : tc
-          )
-        );
+    messages.forEach((message) => {
+      if (message.role !== 'assistant') return;
+      
+      // Check for toolInvocations in the message
+      const toolInvocations = (message as any).toolInvocations || [];
+      
+      toolInvocations.forEach((invocation: any) => {
+        const toolCallId = invocation.toolCallId;
+        if (invocation.state === 'result' && toolCallId && !processedToolResultsRef.current.has(toolCallId)) {
+      // no-op for docs storage; we now render from tool parts directly
+          processedToolResultsRef.current.add(toolCallId);
+          setToolCalls((prev) =>
+            prev.map((tc) =>
+              tc.id === toolCallId
+                ? { ...tc, status: 'completed' as const, result: invocation.result, endTime: Date.now() }
+                : tc
+            )
+          );
+        }
+      });
+      
+      // Also check parts for tool-result type
+      const parts = (message as any).parts || [];
+      parts.forEach((part: any) => {
+        const isToolResult = part?.type === 'tool-result' || part?.type === 'toolResult';
+        if (isToolResult && part.toolCallId && !processedToolResultsRef.current.has(part.toolCallId)) {
+          processedToolResultsRef.current.add(part.toolCallId);
+          setToolCalls((prev) =>
+            prev.map((tc) =>
+              tc.id === part.toolCallId
+                ? { ...tc, status: 'completed' as const, result: part.result, endTime: Date.now() }
+                : tc
+            )
+          );
+        }
+      });
+
+      // Additional check: look for experimental_providerMetadata or other result fields
+      const experimental = (message as any).experimental_providerMetadata;
+      if (experimental?.toolResults) {
+        experimental.toolResults.forEach((toolResult: any) => {
+          const toolCallId = toolResult.toolCallId;
+          if (toolCallId && !processedToolResultsRef.current.has(toolCallId)) {
+            // no-op for docs storage; we now render from tool parts directly
+            processedToolResultsRef.current.add(toolCallId);
+            setToolCalls((prev) =>
+              prev.map((tc) =>
+                tc.id === toolCallId
+                  ? { ...tc, status: 'completed' as const, result: toolResult.result || toolResult, endTime: Date.now() }
+                  : tc
+              )
+            );
+          }
+        });
       }
+
+      // no additional fallback; UI now renders legal docs directly from tool parts
     });
-  }, [messages]);
+  }, [messages, toolCalls]);
 
   // Auto-scroll to bottom when messages change or streaming
   useEffect(() => {
@@ -375,14 +428,63 @@ export default function ChatPage({ className }: ChatProps) {
                       : "bg-gray-50 text-gray-900 border border-gray-200"
                   )}
                 >
-                  {(message.parts ?? []).map((part: { type: string; text?: string }, i: number) => {
-                    if (part?.type !== 'text') return <React.Fragment key={i}></React.Fragment>;
-                    const text = (part as { type: 'text'; text: string }).text;
-                    return message.role === 'user' ? (
-                      <p key={i} className="text-sm whitespace-pre-wrap">{text}</p>
-                    ) : (
-                      <MarkdownContent key={i}>{text}</MarkdownContent>
-                    );
+                  {(message.parts ?? []).map((part: any, i: number) => {
+                    switch (part?.type) {
+                      case 'text': {
+                        const text = part.text || '';
+                        return message.role === 'user' ? (
+                          <p key={i} className="text-sm whitespace-pre-wrap">{text}</p>
+                        ) : (
+                          <MarkdownContent key={i}>{text}</MarkdownContent>
+                        );
+                      }
+                      case 'tool-generateLegalDocs': {
+                        const callId = part.toolCallId;
+                        switch (part.state) {
+                          case 'input-streaming':
+                            return <div key={callId} className="text-sm text-gray-600">Preparing legal docs...</div>;
+                          case 'input-available':
+                            return <div key={callId} className="text-sm text-gray-700">Generating legal documents...</div>;
+                          case 'output-available': {
+                            const docs = part.output?.docs || part.output?.output?.docs || [];
+                            if (!Array.isArray(docs) || docs.length === 0) return null;
+                            return (
+                              <div key={callId} className="mt-2">
+                                <LegalDocsDisplay docs={docs} />
+                              </div>
+                            );
+                          }
+                          case 'output-error':
+                            return <div key={callId} className="text-sm text-red-600">{part.errorText || 'Failed to generate legal documents.'}</div>;
+                        }
+                        return null;
+                      }
+                      case 'dynamic-tool': {
+                        const callId = part.toolCallId || i;
+                        if (part.toolName === 'generateLegalDocs') {
+                          switch (part.state) {
+                            case 'input-streaming':
+                              return <div key={callId} className="text-sm text-gray-600">Preparing legal docs...</div>;
+                            case 'input-available':
+                              return <div key={callId} className="text-sm text-gray-700">Generating legal documents...</div>;
+                            case 'output-available': {
+                              const docs = part.output?.docs || part.output?.output?.docs || [];
+                              if (!Array.isArray(docs) || docs.length === 0) return null;
+                              return (
+                                <div key={callId} className="mt-2">
+                                  <LegalDocsDisplay docs={docs} />
+                                </div>
+                              );
+                            }
+                            case 'output-error':
+                              return <div key={callId} className="text-sm text-red-600">{part.errorText || 'Failed to generate legal documents.'}</div>;
+                          }
+                        }
+                        return null;
+                      }
+                      default:
+                        return <React.Fragment key={i}></React.Fragment>;
+                    }
                   })}
                 </div>
 
@@ -397,6 +499,7 @@ export default function ChatPage({ className }: ChatProps) {
                 </div>
               </div>
             )}
+
 
             {/* Thinking/Loading Indicator */}
             {(isThinking || status === 'streaming') && toolCalls.length === 0 && (

@@ -16,14 +16,14 @@ export async function POST(req: Request) {
 You have access to several tools that can be chained together to complete complex tasks:
 
 🏪 setupStore - Creates and configures a Shopify store
-📄 generateDocs - Generates legal documents (privacy policy, terms of service, etc.)
 💳 configurePayment - Sets up payment methods for the store
 📦 setupInventory - Creates sample products and sets up inventory
+⚖️ generateLegalDocs - Generates comprehensive legal documents (privacy policy, terms of use, NDA) for any business idea
 
 When a user asks you to:
-- Set up a store → Use setupStore first, then generateDocs
-- Create a complete e-commerce setup → Chain all tools: setupStore → generateDocs → configurePayment → setupInventory
-- Generate documents for an existing store → Use generateDocs
+- Set up a store → Use setupStore first, then generateLegalDocs
+- Create a complete e-commerce setup → Chain all tools: setupStore → generateLegalDocs → configurePayment → setupInventory
+- Generate legal documents for any business idea → Use generateLegalDocs
 - Configure payments → Use configurePayment
 - Set up inventory → Use setupInventory
 
@@ -47,24 +47,6 @@ Always explain what you're doing and show progress. Use the tools in logical seq
               storeUrl: `https://${name.toLowerCase().replace(/\s+/g, '-')}.myshopify.com`,
               plan,
               message: `Store "${name}" created successfully with ${plan} plan`
-            };
-          }
-        },
-        generateDocs: {
-          description: "Generate legal documents for the store",
-          inputSchema: z.object({ 
-            storeUrl: z.string().describe("The URL of the store"),
-            docTypes: z.array(z.string()).optional().describe("Types of documents to generate")
-          }),
-          execute: async ({ storeUrl, docTypes = ["privacy", "terms"] }) => {
-            // Simulate API call delay
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            return { 
-              success: true,
-              status: "done", 
-              docs: docTypes.map((type: string) => `${type}.pdf`),
-              message: `Generated ${docTypes.length} legal documents for ${storeUrl}`
             };
           }
         },
@@ -103,15 +85,92 @@ Always explain what you're doing and show progress. Use the tools in logical seq
               message: `Created ${productCount} sample products in ${storeUrl}`
             };
           }
+        },
+        generateLegalDocs: {
+          description: "Generate legal documents (privacy policy, terms of service, NDA) for a business idea",
+          inputSchema: z.object({ 
+            idea: z.string().describe("The business idea or description to generate legal documents for")
+          }),
+          execute: async ({ idea }) => {
+            try {
+              const response = await fetch('http://127.0.0.1:8000/api/docs/generate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ idea }),
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const result = await response.json();
+              
+              // Parse the JSON string to extract individual documents
+              let parsedDocs;
+              try {
+                // Clean the response - remove markdown code blocks if present
+                let cleanedDocs = result.docs.trim();
+                
+                // Remove markdown code block markers
+                if (cleanedDocs.startsWith('```json')) {
+                  cleanedDocs = cleanedDocs.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+                } else if (cleanedDocs.startsWith('```')) {
+                  cleanedDocs = cleanedDocs.replace(/^```\s*/, '').replace(/\s*```$/, '');
+                }
+                
+                // Remove any leading/trailing backticks
+                cleanedDocs = cleanedDocs.replace(/^`+|`+$/g, '');
+                
+                // Validate that we have a valid JSON array
+                if (!cleanedDocs.startsWith('[') && !cleanedDocs.startsWith('{')) {
+                  throw new Error('Response is not valid JSON');
+                }
+                
+                parsedDocs = JSON.parse(cleanedDocs);
+                
+                // Ensure it's an array
+                if (!Array.isArray(parsedDocs)) {
+                  throw new Error('Response is not a JSON array');
+                }
+              } catch (parseError) {
+                console.error('Error parsing legal docs JSON:', parseError);
+                console.error('Raw response:', result.docs);
+                return {
+                  success: false,
+                  status: "error",
+                  message: "Failed to parse legal documents response"
+                };
+              }
+              
+              // Format the documents for better display
+              const formattedDocs = parsedDocs.map((doc: any) => ({
+                type: doc.doc_type,
+                title: doc.title,
+                summary: doc.summary,
+                content: doc.content,
+                placeholders: doc.placeholders || [],
+                defaults_used: doc.defaults_used || {}
+              }));
+              
+              return { 
+                success: true,
+                status: "done", 
+                docs: formattedDocs,
+                message: `Generated ${formattedDocs.length} legal documents for: ${idea}`
+              };
+            } catch (error) {
+              console.error('Error generating legal docs:', error);
+              return { 
+                success: false,
+                status: "error", 
+                message: `Failed to generate legal documents: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
         }
       },
-      onStepFinish: async (step) => {
-        console.log('Step finished:', {
-          toolCalls: step.toolCalls,
-          toolResults: step.toolResults,
-          finishReason: step.finishReason
-        });
-      }
     });
 
     return result.toUIMessageStreamResponse();
