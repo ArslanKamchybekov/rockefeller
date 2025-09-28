@@ -10,19 +10,36 @@ export async function middleware(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // If user is not signed in and the current path is not /login, redirect to /login
-  if (!user && req.nextUrl.pathname !== '/login') {
-    return NextResponse.redirect(new URL('/login', req.url))
+  const pathname = req.nextUrl.pathname
+
+  // Allow access to login page for unauthenticated users
+  if (pathname === '/login') {
+    return res
   }
 
-  // If user is signed in and the current path is /login or /, redirect to /dashboard
-  if (user && (req.nextUrl.pathname === '/login' || req.nextUrl.pathname === '/')) {
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+  // Allow access to root path for both authenticated and unauthenticated users
+  if (pathname === '/') {
+    return res
+  }
+
+  // If user is not signed in, redirect to /login
+  if (!user) {
+    return NextResponse.redirect(new URL('/login', req.url))
   }
 
   return res
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|auth).*)'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - auth (auth callback routes)
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico|auth|.*\\.).*)',
+  ],
 }

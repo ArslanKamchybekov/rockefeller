@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { Download, Eye, Share2, Edit3 } from 'lucide-react'
+import { Download, Share2, Edit3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Slide {
@@ -18,7 +18,7 @@ interface PitchDeckData {
   deck_id: string
   idea: string
   market_research: string
-  financial_model: string
+  influencer_research: string
   deck_content: string
   design_specs: string
 }
@@ -37,7 +37,7 @@ export default function PitchDeckPage({ params }: { params: { id: string } }) {
       deck_id: params.id,
       idea: "AI-powered Shopify store management platform",
       market_research: "Market research data...",
-      financial_model: "Financial model data...",
+      influencer_research: "Influencer research data...",
       deck_content: JSON.stringify({
         slides: [
           {
@@ -129,14 +129,14 @@ export default function PitchDeckPage({ params }: { params: { id: string } }) {
           },
           {
             id: 9,
-            title: "Financial Projections",
+            title: "Influencer Strategy",
             content: [
-              "Year 1: $500K ARR, 200 customers",
-              "Year 2: $2.5M ARR, 800 customers",
-              "Year 3: $8M ARR, 2,000 customers",
-              "Gross margin: 85% • Break-even: Month 18"
+              "Micro-influencers: 1K-10K followers, highly engaged audiences",
+              "Mid-tier influencers: 10K-100K followers, affordable partnerships",
+              "Focus on accessible creators who work with startups",
+              "Targeted approach: Quality over quantity for starting business"
             ],
-            icon: "📊"
+            icon: "🌟"
           },
           {
             id: 10,

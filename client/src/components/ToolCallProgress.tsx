@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { CheckCircle, Clock, Loader2, XCircle, Search, BarChart3, Globe, TrendingUp, FileText, Presentation } from 'lucide-react'
+import { CheckCircle, Clock, Loader2, XCircle } from 'lucide-react'
 
 export interface ToolCall {
   id: string
@@ -49,21 +49,6 @@ const getToolDescription = (toolName: string) => {
   return descriptions[toolName] || 'Processing your request...'
 }
 
-const getToolIcon = (toolName: string) => {
-  const icons: Record<string, React.ReactNode> = {
-    setupStore: <Globe className="h-5 w-5" />,
-    configurePayment: <CheckCircle className="h-5 w-5" />,
-    setupInventory: <BarChart3 className="h-5 w-5" />,
-    generateLegalDocs: <CheckCircle className="h-5 w-5" />,
-    addProduct: <CheckCircle className="h-5 w-5" />,
-    deleteProduct: <XCircle className="h-5 w-5" />,
-    deleteAllProducts: <XCircle className="h-5 w-5" />,
-    webSearch: <Search className="h-5 w-5" />,
-    marketSearch: <TrendingUp className="h-5 w-5" />,
-    generatePitchDeck: <Presentation className="h-5 w-5" />
-  }
-  return icons[toolName] || <Loader2 className="h-5 w-5" />
-}
 
 const getProgressSteps = (toolName: string, duration: number) => {
   if (toolName === 'marketSearch') {
@@ -105,7 +90,7 @@ const getProgressSteps = (toolName: string, duration: number) => {
   if (toolName === 'generatePitchDeck') {
     const steps = [
       { name: 'Researching market', threshold: 8000 },
-      { name: 'Building financial model', threshold: 16000 },
+      { name: 'Finding influencers', threshold: 16000 },
       { name: 'Generating slide content', threshold: 24000 },
       { name: 'Creating design specs', threshold: 32000 },
       { name: 'Finalizing presentation', threshold: 40000 }
@@ -151,12 +136,7 @@ export function ToolCallProgress({ toolCalls, className }: ToolCallProgressProps
             )}
           >
             <div className="flex-shrink-0 mt-0.5">
-              {isRunning && (
-                <div className="relative">
-                  {getToolIcon(toolCall.toolName)}
-                  <Loader2 className="h-3 w-3 animate-spin text-blue-600 absolute -top-1 -right-1" />
-                </div>
-              )}
+              {isRunning && <Loader2 className="h-5 w-5 animate-spin text-blue-600" />}
               {isCompleted && <CheckCircle className="h-5 w-5 text-green-600" />}
               {isError && <XCircle className="h-5 w-5 text-red-600" />}
             </div>

@@ -14,7 +14,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   const { user } = useAuth()
 
   // Pages that should not have the sidebar
-  const noSidebarPages = ['/login', '/auth/callback']
+  const noSidebarPages = ['/login', '/auth/callback', '/']
   
   // Pages that need full height without padding (like chat)
   const fullHeightPages = ['/chat']
@@ -24,9 +24,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
     // This will be handled by middleware, but we can show loading here
     return (
       <main className="flex-1 overflow-auto bg-gray-50 min-h-screen">
-        <div className="p-6">
           {children}
-        </div>
       </main>
     )
   }
@@ -35,9 +33,7 @@ export default function ConditionalLayout({ children }: ConditionalLayoutProps) 
   if (noSidebarPages.includes(pathname)) {
     return (
       <main className="flex-1 overflow-auto bg-gray-50 min-h-screen">
-        <div className="p-6">
           {children}
-        </div>
       </main>
     )
   }
