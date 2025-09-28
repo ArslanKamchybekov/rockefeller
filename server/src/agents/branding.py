@@ -97,12 +97,23 @@ def generate_branding_video(idea_string: str) -> dict:
             time.sleep(10)
             operation = client.operations.get(operation)
 
-        generated_video = operation.response.generated_videos[0]
-        client.files.download(file=generated_video.video)
-        generated_video.video.save("branding_video.mp4")
+        # Guard against missing/empty responses
+        response = getattr(operation, 'response', None)
+        videos = getattr(response, 'generated_videos', None) if response else None
+        if not videos or len(videos) == 0:
+            print("Video generation returned no videos.")
+            return { "video": False }
+
+        generated_video = videos[0]
+        try:
+            client.files.download(file=generated_video.video)
+            generated_video.video.save("branding_video.mp4")
+        except Exception as dl_e:
+            print(f"Error saving generated video: {dl_e}")
+            return { "video": False }
 
         return { "video": True }
     except Exception as e:
         print(f"Error processing branding video: {e}")
-        return { "video": None }
+        return { "video": False }
     

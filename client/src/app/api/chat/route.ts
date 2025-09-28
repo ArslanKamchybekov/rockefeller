@@ -956,11 +956,34 @@ Format as structured JSON with specific color codes and design recommendations.`
               }
               
               const data = await response.json();
-              
+
+              // Only fetch the video file when the API confirms generation
+              let videoDataUrl: string | null = null;
+              if (data?.video === true) {
+                try {
+                  const vidResp = await fetch('http://127.0.0.1:8000/api/branding/video');
+                  if (vidResp.ok) {
+                    const buf = await vidResp.arrayBuffer();
+                    const uint8 = new Uint8Array(buf);
+                    let binary = '';
+                    const chunkSize = 0x8000;
+                    for (let i = 0; i < uint8.length; i += chunkSize) {
+                      const chunk = uint8.subarray(i, i + chunkSize);
+                      binary += String.fromCharCode.apply(null, Array.prototype.slice.call(chunk) as any);
+                    }
+                    const b64 = btoa(binary);
+                    videoDataUrl = `data:video/mp4;base64,${b64}`;
+                  }
+                } catch (e) {
+                  console.error('Error fetching generated branding video:', e);
+                }
+              }
+
               return {
                 success: true,
                 status: "done",
-                video: data.video,
+                video: data.video === true,
+                video_data_url: videoDataUrl,
                 message: `Successfully generated branding video for "${idea}"`
               };
             } catch (error) {
