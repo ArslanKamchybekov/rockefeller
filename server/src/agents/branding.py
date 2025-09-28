@@ -4,6 +4,7 @@ import json
 import re
 import time
 import requests
+import base64
 
 def generate_branding (idea_string: str) -> dict:
     """
@@ -63,10 +64,12 @@ def generate_branding (idea_string: str) -> dict:
             size="1024x1024",
         )
 
-        image_url = image_response.data[0].url      
-        result['logo'] = image_url
+        image_data = image_response.data[0]    
+        
+        with open("branding_photo.png", "wb") as f:
+            f.write(base64.b64decode(image_data))
 
-        print("Generated logo: ", result['logo'])
+        print("Generated logo!")
 
         return { "branding": result }
     
