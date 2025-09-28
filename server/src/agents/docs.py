@@ -1,5 +1,5 @@
-from models.docs import LegalDocsInput, LegalDocsOutput
-from utils.create_gemini import create_gemini_client
+from src.models.docs import LegalDocsInput, LegalDocsOutput
+from src.utils.create_gemini import create_gemini_client
 import json 
 
 def generate_legal_docs(input: LegalDocsInput) -> LegalDocsOutput:
@@ -36,24 +36,11 @@ def generate_legal_docs(input: LegalDocsInput) -> LegalDocsOutput:
         generation_config={"temperature": 0.3},
     )
 
-    data = json.loads(response.text)
+    # data = json.loads(response.text)
 
-    for doc in data:
-        print(f"# {doc['title']}\n")
-        print(doc['content'])
-        print("\n" + "="*60 + "\n")
-
-    # Clean the response to ensure it's valid JSON
-    cleaned_response = response.text.strip()
+    # for doc in data:
+    #     print(f"# {doc['title']}\n")
+    #     print(doc['content'])
+    #     print("\n" + "="*60 + "\n")
     
-    # Remove markdown code blocks if present
-    if cleaned_response.startswith('```json'):
-        cleaned_response = cleaned_response.replace('```json', '').replace('```', '').strip()
-    elif cleaned_response.startswith('```'):
-        cleaned_response = cleaned_response.replace('```', '').strip()
-    
-    # Remove any leading/trailing backticks
-    import re
-    cleaned_response = re.sub(r'^`+|`+$', '', cleaned_response)
-    
-    return { "docs": cleaned_response }
+    return { "docs": response.text }
