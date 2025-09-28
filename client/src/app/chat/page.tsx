@@ -361,7 +361,7 @@ export default function ChatPage({ className }: ChatProps) {
             </div>
 
             {/* Chat Input Container */}
-            <div className="bg-gray-50 rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="bg-gray-50 rounded-md border border-gray-200 shadow-sm p-3">
               <form onSubmit={onSubmit} className="space-y-4">
                 {/* File Upload */}
                 <input

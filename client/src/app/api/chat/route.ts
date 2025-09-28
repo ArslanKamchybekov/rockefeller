@@ -26,7 +26,9 @@ You have access to these tools:
 ⚖️ generateLegalDocs - Generates comprehensive legal documents (privacy policy, terms of use, NDA) for any business idea (real API)
 🔍 webSearch - Search the web for real-time information using OpenAI's web search capabilities
 📊 marketSearch - Search for market data, competitor analysis, and industry statistics
-📋 generatePitchDeck - Generate a comprehensive pitch deck with market research, financial models, and professional design
+📋 generatePitchDeck - Generate a comprehensive pitch deck with market research, influencer strategy, and professional design
+🎨 generateBranding - Generate branding assets (name, tagline, logo) for a business idea
+🎬 generateBrandingVideo - Generate a branding video for a business idea
 
 When a user asks you to:
 - Set up a store → Use setupStore first, then generateLegalDocs
@@ -39,7 +41,9 @@ When a user asks you to:
 - Delete all products from store → Use deleteAllProducts
 - Search for information on the web → Use webSearch for real-time information
 - Research competitors or market data → Use marketSearch for industry analysis and competitor insights
-- Generate a pitch deck → Use generatePitchDeck for comprehensive investor presentations
+- Generate a pitch deck → Use generatePitchDeck for comprehensive investor presentations with market research and influencer strategy
+- Generate branding assets → Use generateBranding for business name, tagline, and logo creation
+- Create a branding video → Use generateBrandingVideo for promotional video content
 
 Always explain what you're doing and show progress. Use the tools in logical sequence and provide clear feedback about each step. If a user mentions a store name, use it in the setupStore tool. Be helpful and proactive in suggesting next steps.
 
@@ -656,7 +660,7 @@ Focus on actionable insights for business strategy. Include specific data points
             team_size: z.number().optional().describe("Current team size"),
             stage: z.enum(['idea', 'mvp', 'early_traction', 'growth', 'scale']).optional().describe("Current business stage")
           }),
-          execute: async ({ idea, problem, target_market, competitors = [], revenue_model, funding_amount, team_size, stage = 'idea' }) => {
+          execute: async ({ idea, problem, target_market, competitors = [] }) => {
             try {
               // Step 1: Market Research Agent
               const marketResearch = await streamText({
@@ -685,33 +689,56 @@ Format as structured JSON.`
                 marketData += chunk;
               }
 
-              // Step 2: Financial Model Agent
-              const financialModel = await streamText({
+              // Step 2: Influencer Search Agent
+              const influencerResearch = await streamText({
                 model: openai('gpt-4o'),
                 messages: [{
                   role: 'user',
-                  content: `Create a financial model for this business idea: "${idea}"
+                  content: `Find the most relevant influencers for this STARTING BUSINESS: "${idea}"
 
-${revenue_model ? `Revenue Model: ${revenue_model}` : ''}
-${funding_amount ? `Funding Sought: $${funding_amount}K` : ''}
-${team_size ? `Team Size: ${team_size}` : ''}
-Stage: ${stage}
+${target_market ? `Target Market: ${target_market}` : ''}
+${problem ? `Problem: ${problem}` : ''}
 
-Provide:
-1. Revenue projections (3-5 years)
-2. Key metrics and KPIs
-3. Unit economics
-4. Growth assumptions
-5. Funding requirements and use of funds
-6. Break-even analysis
+IMPORTANT: This is a starting business, so focus on influencers who are:
+1. Accessible and likely to work with new businesses
+2. NOT extremely famous (avoid celebrities, mega-influencers with 1M+ followers)
+3. More affordable for partnerships and collaborations
+4. Have engaged, niche audiences
 
-Format as structured JSON with specific numbers and calculations.`
+Search for influencers who:
+1. Are relevant to the target market/industry
+2. Have 1K-100K followers (micro to mid-tier influencers)
+3. Create content related to the problem/solution
+4. Are active on social platforms
+5. Have high engagement rates relative to their follower count
+6. Are known to work with small/starting businesses
+
+For each influencer, provide:
+- Name and handle
+- Platform (Instagram, Twitter, LinkedIn, YouTube, TikTok)
+- Follower count range (1K-100K preferred)
+- Engagement rate
+- Content focus areas
+- Social media links
+- Why they're relevant and accessible for a starting business
+- Estimated partnership cost range (if known)
+
+Focus on:
+- Micro-influencers (1K-10K followers) - most accessible
+- Mid-tier influencers (10K-100K followers) - good reach/affordability balance
+- Industry experts with smaller but engaged followings
+- Content creators who work with startups
+- Entrepreneurs who share their journey
+
+AVOID: Celebrities, mega-influencers, or anyone with 1M+ followers
+
+Format as structured JSON with social links.`
                 }]
               });
 
-              let financialData = '';
-              for await (const chunk of financialModel.textStream) {
-                financialData += chunk;
+              let influencerData = '';
+              for await (const chunk of influencerResearch.textStream) {
+                influencerData += chunk;
               }
 
               // Step 3: Deck Generator Agent
@@ -724,8 +751,8 @@ Format as structured JSON with specific numbers and calculations.`
 Market Research Data:
 ${marketData}
 
-Financial Model Data:
-${financialData}
+Influencer Research Data:
+${influencerData}
 
 Create slides for:
 1. Title Slide (Company name, tagline, contact info)
@@ -736,7 +763,7 @@ Create slides for:
 6. Traction (Metrics, milestones, growth)
 7. Competition (Competitive landscape, differentiation)
 8. Team (Founders, advisors, key hires)
-9. Financial Projections (Revenue, growth, key metrics)
+9. Influencer Strategy (Key influencers, partnership opportunities)
 10. Ask (Funding amount, use of funds, next steps)
 
 Each slide should have:
@@ -787,11 +814,11 @@ Format as structured JSON with specific color codes and design recommendations.`
                 deck_id: deckId,
                 idea,
                 market_research: marketData,
-                financial_model: financialData,
+                influencer_research: influencerData,
                 deck_content: deckData,
                 design_specs: designData,
                 preview_url: `/pitchdeck/${deckId}`,
-                message: `Generated comprehensive pitch deck for "${idea}". Preview available at /pitchdeck/${deckId}`
+                message: `Generated comprehensive pitch deck for "${idea}" with market research and influencer strategy. Preview available at /pitchdeck/${deckId}`
               };
             } catch (error) {
               console.error('Error generating pitch deck:', error);
@@ -799,6 +826,80 @@ Format as structured JSON with specific color codes and design recommendations.`
                 success: false,
                 status: "error",
                 message: `Failed to generate pitch deck: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
+        },
+        generateBranding: {
+          description: "Generate branding assets (name, tagline, logo) for a business idea",
+          inputSchema: z.object({ 
+            idea: z.string().describe("The business idea or concept to generate branding for")
+          }),
+          execute: async ({ idea }) => {
+            try {
+              const response = await fetch('http://127.0.0.1:8000/api/branding/generate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ idea_string: idea }),
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              
+              return {
+                success: true,
+                status: "done",
+                branding: data.branding,
+                message: `Successfully generated branding for "${idea}"`
+              };
+            } catch (error) {
+              console.error('Error generating branding:', error);
+              return {
+                success: false,
+                status: "error",
+                message: `Failed to generate branding: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
+        },
+        generateBrandingVideo: {
+          description: "Generate a branding video for a business idea",
+          inputSchema: z.object({ 
+            idea: z.string().describe("The business idea or concept to generate a branding video for")
+          }),
+          execute: async ({ idea }) => {
+            try {
+              const response = await fetch('http://127.0.0.1:8000/api/branding/generate-video', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ idea_string: idea }),
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              
+              return {
+                success: true,
+                status: "done",
+                video: data.video,
+                message: `Successfully generated branding video for "${idea}"`
+              };
+            } catch (error) {
+              console.error('Error generating branding video:', error);
+              return {
+                success: false,
+                status: "error",
+                message: `Failed to generate branding video: ${error instanceof Error ? error.message : 'Unknown error'}`
               };
             }
           }
