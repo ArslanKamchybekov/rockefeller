@@ -1,7 +1,8 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { CheckCircle, Clock, Loader2, XCircle } from 'lucide-react'
+import Image from 'next/image'
+import { CheckCircle, Loader2, XCircle } from 'lucide-react'
 
 export interface ToolCall {
   id: string
@@ -30,7 +31,10 @@ const getToolDisplayName = (toolName: string) => {
     marketSearch: 'Analyzing market data',
     generatePitchDeck: 'Generating pitch deck',
     generateBranding: 'Creating branding assets',
-    generateBrandingVideo: 'Generating branding video'
+    generateBrandingVideo: 'Generating branding video',
+    storeLink: 'Store link ready',
+    mailSetup: 'Setting up assistant inbox',
+    influencerSearch: 'Finding influencers',
   }
   return displayNames[toolName] || toolName
 }
@@ -48,7 +52,10 @@ const getToolDescription = (toolName: string) => {
     marketSearch: 'Researching competitors, trends, and market statistics',
     generatePitchDeck: 'Creating comprehensive investor presentation with market research and financial models',
     generateBranding: 'Creating business name, tagline, and logo design',
-    generateBrandingVideo: 'Generating promotional video content for your brand'
+    generateBrandingVideo: 'Generating promotional video content for your brand',
+    storeLink: 'Surface the link to your created store',
+    mailSetup: 'Setting up the customer assistant inbox',
+    influencerSearch: 'Recommending accessible influencers (micro/mid-tier)',
   }
   return descriptions[toolName] || 'Processing your request...'
 }
@@ -194,7 +201,128 @@ export function ToolCallProgress({ toolCalls, className }: ToolCallProgressProps
               
               {isCompleted && toolCall.result && (
                 <div className="mt-2 p-2 bg-white rounded border text-xs text-gray-700">
-                  <span className="font-medium">Result:</span> {toolCall.result.message || 'Completed successfully'}
+                  {toolCall.result?.pdf_data_url ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">Document</div>
+                        <div className="text-xs text-gray-600 truncate">A PDF has been generated for download.</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={toolCall.result.pdf_data_url}
+                          download={"document.pdf"}
+                          className="inline-flex items-center px-2.5 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-800"
+                        >
+                          Download PDF
+                        </a>
+                        <a
+                          href={toolCall.result.pdf_data_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-2.5 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        >
+                          Preview
+                        </a>
+                      </div>
+                    </div>
+                  ) : toolCall.toolName === 'generateBranding' ? (
+                    <div className="flex items-center gap-3">
+                      {!!toolCall.result?.branding?.logo && typeof toolCall.result.branding.logo === 'string' ? (
+                        <Image
+                          src={toolCall.result.branding.logo}
+                          alt={toolCall.result.branding?.brand_name || 'Generated logo'}
+                          width={64}
+                          height={64}
+                          className="w-16 h-16 rounded border border-gray-200 object-contain bg-white"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded border border-dashed border-gray-300 flex items-center justify-center text-gray-400 bg-white">
+                          No logo
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">
+                          {toolCall.result?.branding?.brand_name || 'Brand name'}
+                        </div>
+                        <div className="text-xs text-gray-600 truncate">
+                          {toolCall.result?.branding?.tagline || 'Tagline not available'}
+                        </div>
+                      </div>
+                    </div>
+                  ) : toolCall.toolName === 'generatePitchDeck' ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">Pitch Deck</div>
+                        <div className="text-xs text-gray-600 truncate">A PDF has been generated for download.</div>
+                      </div>
+                      {toolCall.result?.pdf_data_url ? (
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={toolCall.result.pdf_data_url}
+                            download={"pitch-deck.pdf"}
+                            className="inline-flex items-center px-2.5 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-800"
+                          >
+                            Download PDF
+                          </a>
+                          <a
+                            href={toolCall.result.pdf_data_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-2.5 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                          >
+                            Preview
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-500">PDF not available</div>
+                      )}
+                    </div>
+                  ) : toolCall.toolName === 'storeLink' ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">Store Link</div>
+                        <div className="text-xs text-gray-600 truncate">Your store is ready.</div>
+                      </div>
+                      {toolCall.result?.store_url ? (
+                        <a
+                          href={toolCall.result.store_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center px-2.5 py-1.5 rounded bg-gray-900 text-white hover:bg-gray-800"
+                        >
+                          Open Store
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : toolCall.toolName === 'mailSetup' ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">Assistant Inbox</div>
+                        <div className="text-xs text-gray-600 truncate">{toolCall.result?.message || 'Inbox is being set up.'}</div>
+                      </div>
+                    </div>
+                  ) : toolCall.toolName === 'influencerSearch' ? (
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium text-gray-900">Influencers</div>
+                      <div className="space-y-1">
+                        {Array.isArray(toolCall.result?.influencers) ? (
+                          (toolCall.result.influencers as any[]).slice(0, 5).map((inf, idx) => (
+                            <div key={idx} className="text-xs text-gray-700 truncate">
+                              {inf.name || inf.handle || 'Influencer'}{inf.platform ? ` • ${inf.platform}` : ''}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-gray-600 whitespace-pre-wrap">
+                            {typeof toolCall.result?.influencers === 'string' ? toolCall.result.influencers.slice(0, 500) : 'No influencer data'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-medium">Result:</span> {toolCall.result.message || 'Completed successfully'}
+                    </>
+                  )}
                 </div>
               )}
               
@@ -203,10 +331,6 @@ export function ToolCallProgress({ toolCalls, className }: ToolCallProgressProps
                   <span className="font-medium">Error:</span> {toolCall.result?.message || 'An error occurred'}
                 </div>
               )}
-            </div>
-            
-            <div className="flex-shrink-0">
-              <Clock className="h-4 w-4 text-gray-400" />
             </div>
           </div>
         )
