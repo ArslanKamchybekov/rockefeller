@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     await browser.close()
 
     // Return PDF as response
-    return new NextResponse(pdf, {
+    return new NextResponse(Buffer.from(pdf), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="pitch-deck-${deckId}.pdf"`
@@ -162,9 +162,11 @@ function generatePitchDeckHTML(slides: any[]) {
           <div class="slide-icon">${slide.icon || '📊'}</div>
           <h1 class="slide-title">${slide.title}</h1>
           <div class="slide-content">
-            ${slide.content.map(point => `
-              <div class="slide-point">${point}</div>
-            `).join('')}
+            ${Array.isArray(slide.content)
+              ? slide.content.map((point: any) => `
+                  <div class="slide-point">${String(point)}</div>
+                `).join('')
+              : `<div class=\"slide-point\">${String(slide.content ?? '')}</div>`}
           </div>
           <div class="slide-number">${index + 1} / ${slides.length}</div>
         </div>

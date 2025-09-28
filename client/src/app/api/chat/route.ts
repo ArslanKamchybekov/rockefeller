@@ -11,15 +11,17 @@ export async function POST(req: Request) {
   try {
     const { messages, userId }: { messages: UIMessage[], userId?: string } = await req.json();
 
+    // Detect if user asked for a full end-to-end flow
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    const lastText = (typeof (lastUserMsg as any)?.content === 'string' ? (lastUserMsg as any).content : '')
+      .toLowerCase();
+    const wantsFullFlow = /full\s*flow|complete\s*setup|end[- ]?to[- ]?end|all\s*steps|run\s*everything/.test(lastText);
+
     const result = streamText({
       model: google('gemini-2.5-flash'),
       system: `You are an AI assistant that helps users set up e-commerce stores and manage business workflows. 
 
 You have access to these tools:
-
-🏪 setupStore - Creates and configures a Shopify store (simulated)
-💳 configurePayment - Sets up payment methods for the store (simulated)
-📦 setupInventory - Creates sample products and sets up inventory (simulated)
 🛍️ addProduct - Adds a new product to the user's Shopify store (real Shopify API)
 🗑️ deleteProduct - Deletes a product from the user's Shopify store (real Shopify API)
 🗑️ deleteAllProducts - Deletes all products from the user's Shopify store (real Shopify API)
@@ -30,12 +32,21 @@ You have access to these tools:
 🎨 generateBranding - Generate branding assets (name, tagline, logo) for a business idea
 🎬 generateBrandingVideo - Generate a branding video for a business idea
 
+Full setup / full flow:
+- If the user asks for a "full setup", "full flow", or "end-to-end" run these tools in order, passing context between steps:
+  1) marketSearch → market insights, competitors
+  2) generateBranding → brand name, tagline, logo
+  3) generateLegalDocs → use branding/context; return PDFs
+  4) storeLink → surface https://rockefeller-store.myshopify.com
+  5) mailSetup → indicate assistant inbox is being set up
+  6) influencerSearch → accessible influencer list
+  7) generateBrandingVideo → promotional video plan/content
+  8) generatePitchDeck → produce deck leveraging market + influencer data; export PDF
+- Always summarize each step and carry forward relevant outputs.
+- After completing, suggest adding products to the created store.
+
 When a user asks you to:
-- Set up a store → Use setupStore first, then generateLegalDocs
-- Create a complete e-commerce setup → Chain all tools: setupStore → generateLegalDocs → configurePayment → setupInventory
 - Generate legal documents for any business idea → Use generateLegalDocs
-- Configure payments → Use configurePayment
-- Set up inventory → Use setupInventory
 - Add a product to store → Use addProduct (price should be in dollars, e.g., 99.99 for $99.99). If the user has uploaded images, look for "Image URLs:" in their message and use those URLs in the images parameter.
 - Delete a product from store → Use deleteProduct
 - Delete all products from store → Use deleteAllProducts
@@ -53,63 +64,91 @@ When creating products with images:
 3. Use those URLs in the images parameter of addProduct tool
 4. If no image URLs are found, create the product without images`,
       messages: convertToModelMessages(messages),
-      stopWhen: stepCountIs(10), // Allow up to 10 steps for multi-tool workflows
+      stopWhen: stepCountIs(12), // Allow multi-step chained workflows
+      prepareStep: async ({ steps }) => {
+        if (!wantsFullFlow) return {};
+        // Enforce your exact sequence regardless of text-only steps between tools
+        const sequence = [
+          'marketSearch',
+          'generateBranding',
+          'generateLegalDocs',
+          'storeLink',
+          'mailSetup',
+          'influencerSearch',
+          'generateBrandingVideo',
+          'generatePitchDeck',
+        ];
+        const usedTools = new Set<string>();
+        try {
+          for (const s of (steps as any) || []) {
+            const toolCalls = (s.toolCalls || []).map((t: any) => t.toolName);
+            const toolResults = (s.toolResults || []).map((t: any) => t.toolName);
+            for (const name of [...toolCalls, ...toolResults]) usedTools.add(name);
+          }
+        } catch {}
+        const nextTool = sequence.find(name => !usedTools.has(name));
+        if (!nextTool) return {};
+        return { activeTools: [nextTool] } as any;
+      },
       tools: {
-        setupStore: {
-          description: "Create and configure a Shopify store",
-          inputSchema: z.object({ 
-            name: z.string().describe("The name of the store to create"),
-            plan: z.string().optional().describe("The store plan (basic, professional, enterprise)")
-          }),
-          execute: async ({ name, plan = "basic" }) => {
-            // Simulate API call delay
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            
-            return { 
+        storeLink: {
+          description: "Surface the created store link in the UI",
+          inputSchema: z.object({}).optional() as any,
+          execute: async () => {
+            const storeUrl = `https://rockefeller-store.myshopify.com`;
+            return {
               success: true,
-              status: "done", 
-              storeUrl: `https://${name.toLowerCase().replace(/\s+/g, '-')}.myshopify.com`,
-              plan,
-              message: `Store "${name}" created successfully with ${plan} plan`
+              status: 'done',
+              store_url: storeUrl,
+              message: `Here is the link to your store: [rockefeller-store.myshopify.com](${storeUrl})`
             };
           }
         },
-        configurePayment: {
-          description: "Configure payment methods for the store",
-          inputSchema: z.object({ 
-            storeUrl: z.string().describe("The URL of the store"),
-            paymentMethods: z.array(z.string()).optional().describe("Payment methods to enable")
-          }),
-          execute: async ({ storeUrl, paymentMethods = ["credit_card", "paypal"] }) => {
-            // Simulate API call delay
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            return { 
+        mailSetup: {
+          description: "Indicate that the customer assistant's email inbox is being set up",
+          inputSchema: z.object({}).optional() as any,
+          execute: async () => {
+            return {
               success: true,
-              status: "done", 
-              enabledMethods: paymentMethods,
-              message: `Configured ${paymentMethods.length} payment methods for ${storeUrl}`
+              status: 'done',
+              message: 'Customer assistant\'s email inbox is being set up.'
             };
           }
         },
-        setupInventory: {
-          description: "Set up initial inventory and product catalog",
-          inputSchema: z.object({ 
-            storeUrl: z.string().describe("The URL of the store"),
-            productCount: z.number().optional().describe("Number of sample products to create")
+        influencerSearch: {
+          description: "Find accessible influencers (micro/mid-tier) for the brand/idea",
+          inputSchema: z.object({
+            idea: z.string().describe('Brand or business idea to find influencers for'),
+            target_market: z.string().optional().describe('Target audience'),
           }),
-          execute: async ({ storeUrl, productCount = 5 }) => {
-            // Simulate API call delay
-            await new Promise(resolve => setTimeout(resolve, 1800));
-            
-            return { 
-              success: true,
-              status: "done", 
-              productsCreated: productCount,
-              message: `Created ${productCount} sample products in ${storeUrl}`
-            };
+          execute: async ({ idea, target_market }) => {
+            try {
+              const res = await streamText({
+                model: openai('gpt-4o'),
+                messages: [{
+                  role: 'user',
+                  content: `Find accessible influencers for: "${idea}"${target_market ? ` targeting ${target_market}` : ''}. Focus on micro/mid-tier (1K-100K). Return concise JSON list with: name, handle, platform, followers_range, engagement, focus, links, why_relevant.`
+                }]
+              });
+              let text = '';
+              for await (const chunk of res.textStream) text += chunk;
+              let influencers: any = text;
+              try {
+                const s = text.indexOf('['); const e = text.lastIndexOf(']') + 1;
+                influencers = JSON.parse(text.substring(s, e));
+              } catch {}
+              return {
+                success: true,
+                status: 'done',
+                influencers,
+                message: 'Influencer recommendations generated.'
+              };
+            } catch {
+              return { success: false, status: 'error', message: 'Failed to generate influencer recommendations' };
+            }
           }
         },
+        
         generateLegalDocs: {
           description: "Generate legal documents (privacy policy, terms of service, NDA) for a business idea",
           inputSchema: z.object({ 
@@ -805,8 +844,38 @@ Format as structured JSON with specific color codes and design recommendations.`
                 designData += chunk;
               }
 
-              // Generate unique deck ID
+              // Build slides JSON from deckData
+              let slides: any[] = [];
+              try {
+                const start = deckData.indexOf('['); const end = deckData.lastIndexOf(']') + 1;
+                slides = JSON.parse(deckData.substring(start, end));
+              } catch {
+                slides = [{ title: idea, icon: '📊', content: ['Pitch deck generated.'] }];
+              }
+
+              // Export PDF via Next API and return a downloadable data URL
+              let deckPdfDataUrl: string | null = null;
               const deckId = `deck_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              try {
+                const pdfResp = await fetch('http://127.0.0.1:3000/api/pitchdeck/export', {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ deckId, slides })
+                });
+                if (pdfResp.ok) {
+                  const buf = await pdfResp.arrayBuffer();
+                  const uint8 = new Uint8Array(buf);
+                  let binary = '';
+                  const chunkSize = 0x8000; // 32KB chunks to avoid stack overflow
+                  for (let i = 0; i < uint8.length; i += chunkSize) {
+                    const chunk = uint8.subarray(i, i + chunkSize);
+                    binary += String.fromCharCode.apply(null, Array.prototype.slice.call(chunk) as any);
+                  }
+                  const b64 = btoa(binary);
+                  deckPdfDataUrl = `data:application/pdf;base64,${b64}`;
+                }
+              } catch (e) {
+                console.error('Error exporting pitch deck PDF:', e);
+              }
 
               return {
                 success: true,
@@ -817,8 +886,8 @@ Format as structured JSON with specific color codes and design recommendations.`
                 influencer_research: influencerData,
                 deck_content: deckData,
                 design_specs: designData,
-                preview_url: `/pitchdeck/${deckId}`,
-                message: `Generated comprehensive pitch deck for "${idea}" with market research and influencer strategy. Preview available at /pitchdeck/${deckId}`
+                pdf_data_url: deckPdfDataUrl,
+                message: `Generated comprehensive pitch deck for "${idea}" with market research and influencer strategy.${deckPdfDataUrl ? ' PDF ready to download.' : ''}`
               };
             } catch (error) {
               console.error('Error generating pitch deck:', error);
