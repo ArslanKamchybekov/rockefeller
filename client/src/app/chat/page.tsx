@@ -4,6 +4,8 @@ import * as React from "react";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai';
+import { useAuth } from '@/components/AuthProvider';
+import { uploadMultipleImages } from '@/lib/storage';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -17,6 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ToolCallProgress, ToolCall } from '@/components/ToolCallProgress';
 import { LegalDocsDisplay } from '@/components/LegalDocsDisplay';
+import Image from "next/image";
 
 interface ChatProps {
   className?: string;
@@ -81,23 +84,30 @@ export default function ChatPage({ className }: ChatProps) {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [files, setFiles] = useState<FileList | undefined>(undefined);
+  const [uploadedImageUrls, setUploadedImageUrls] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [toolCalls, setToolCalls] = useState<ToolCall[]>([]);
+  const { user } = useAuth();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const transport = useMemo(() => new DefaultChatTransport({
-    api: '/api/chat',
-    fetch: async (url, init) => {
-      const body = JSON.parse((init?.body as string) || '{}');
-      return fetch(url, {
-        ...init,
-        body: JSON.stringify({
-          ...body,
-          model: 'gemini-1.5-flash',
-        }),
-      });
-    },
-  }), []);
+  const transport = useMemo(() => {
+    return new DefaultChatTransport({
+      api: '/api/chat',
+      fetch: async (url, init) => {
+        const body = JSON.parse((init?.body as string) || '{}');
+        console.log('Transport fetch called with userId:', user?.id);
+        return fetch(url, {
+          ...init,
+          body: JSON.stringify({
+            ...body,
+            model: 'gemini-1.5-flash',
+            userId: user?.id || null,
+          }),
+        });
+      },
+    });
+  }, [user?.id]);
 
   // Build options as 'any' to allow onToolResult even if type definitions lag behind
   const chatOptions: any = {
@@ -167,6 +177,7 @@ export default function ChatPage({ className }: ChatProps) {
       if (toolCall?.dynamic) return;
     },
   } as any);
+
 
   // Reset thinking state when status changes
   useEffect(() => {
@@ -263,22 +274,51 @@ export default function ChatPage({ className }: ChatProps) {
 
   const hasMessages = messages.length > 0;
 
+  const handleFileUpload = async (files: FileList) => {
+    if (!files || files.length === 0) return [];
+    
+    setIsUploading(true);
+    try {
+      const uploadResults = await uploadMultipleImages(files);
+      const successfulUploads = uploadResults
+        .filter(result => result.url && !result.error)
+        .map(result => result.url);
+      
+      setUploadedImageUrls(prev => [...prev, ...successfulUploads]);
+      return successfulUploads;
+    } catch (error) {
+      console.error('Error uploading images:', error);
+      return [];
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() && (!files || files.length === 0)) return;
     
     setIsThinking(true);
-    const fileParts = files && files.length > 0
-      ? []
-      : [];
+    
+    // Upload images if files are selected
+    let imageUrls: string[] = [];
+    if (files && files.length > 0) {
+      imageUrls = await handleFileUpload(files);
+    }
+    
+    // Include uploaded image URLs in the message
+    const messageText = input + (imageUrls.length > 0 ? `\n\n[Images uploaded: ${imageUrls.length} image(s)]\nImage URLs: ${imageUrls.join(', ')}` : '');
+    
     await sendMessage({
       role: 'user',
       parts: [
-        { type: 'text', text: input },
-        ...fileParts,
+        { type: 'text', text: messageText },
       ],
     });
+    
     setInput('');
+    setFiles(undefined);
+    setUploadedImageUrls([]);
   };
 
   return (
@@ -321,7 +361,7 @@ export default function ChatPage({ className }: ChatProps) {
                 {/* File Upload */}
                 <input
                   type="file"
-                  accept="image/*,application/pdf"
+                  accept="image/*"
                   className="hidden"
                   onChange={(event) => {
                     if (event.target.files) {
@@ -335,14 +375,19 @@ export default function ChatPage({ className }: ChatProps) {
                 {/* Selected Files Display */}
                 {files && files.length > 0 && (
                   <div className="space-y-2">
-                    <div className="text-sm font-medium text-gray-700">Selected files:</div>
+                    <div className="text-sm font-medium text-gray-700">
+                      {isUploading ? 'Uploading images...' : 'Ready to upload:'}
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {Array.from(files).map((file, index) => (
                         <div
                           key={index}
-                          className="flex items-center gap-2 bg-gray-100 text-gray-800 px-3 py-1 rounded-lg text-sm"
+                          className="flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-lg text-sm border border-blue-200"
                         >
                           <span className="truncate max-w-32">{file.name}</span>
+                          {isUploading && (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -352,7 +397,40 @@ export default function ChatPage({ className }: ChatProps) {
                               });
                               setFiles(dt.files.length > 0 ? dt.files : undefined);
                             }}
-                            className="text-gray-600 hover:text-gray-800"
+                            className="text-blue-600 hover:text-blue-800"
+                            disabled={isUploading}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Uploaded Images Display */}
+                {uploadedImageUrls.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-green-700">Uploaded images:</div>
+                    <div className="flex flex-wrap gap-2">
+                      {uploadedImageUrls.map((url, index) => (
+                        <div
+                          key={index}
+                          className="relative group"
+                        >
+                          <Image
+                            src={url}
+                            alt={`Uploaded image ${index + 1}`}
+                            width={64}
+                            height={64}
+                            className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUploadedImageUrls(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="h-3 w-3" />
                           </button>
@@ -527,7 +605,7 @@ export default function ChatPage({ className }: ChatProps) {
               {/* File Upload */}
               <input
                 type="file"
-                accept="image/*,application/pdf"
+                accept="image/*"
                 className="hidden"
                 onChange={(event) => {
                   if (event.target.files) {
@@ -541,14 +619,19 @@ export default function ChatPage({ className }: ChatProps) {
               {/* Selected Files Display */}
               {files && files.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-sm font-medium text-gray-700">Selected files:</div>
+                  <div className="text-sm font-medium text-gray-700">
+                    {isUploading ? 'Uploading images...' : 'Ready to upload:'}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {Array.from(files).map((file, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-2 bg-gray-100 text-gray-800 px-3 py-1 rounded-lg text-sm"
+                        className="flex items-center gap-2 bg-blue-50 text-blue-800 px-3 py-1 rounded-lg text-sm border border-blue-200"
                       >
                         <span className="truncate max-w-32">{file.name}</span>
+                        {isUploading && (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -558,7 +641,40 @@ export default function ChatPage({ className }: ChatProps) {
                             });
                             setFiles(dt.files.length > 0 ? dt.files : undefined);
                           }}
-                          className="text-gray-600 hover:text-gray-800"
+                          className="text-blue-600 hover:text-blue-800"
+                          disabled={isUploading}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Uploaded Images Display */}
+              {uploadedImageUrls.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium text-green-700">Uploaded images:</div>
+                  <div className="flex flex-wrap gap-2">
+                    {uploadedImageUrls.map((url, index) => (
+                      <div
+                        key={index}
+                        className="relative group"
+                      >
+                        <Image
+                          src={url}
+                          alt={`Uploaded image ${index + 1}`}
+                          width={64}
+                          height={64}
+                          className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadedImageUrls(prev => prev.filter((_, i) => i !== index));
+                          }}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <X className="h-3 w-3" />
                         </button>
