@@ -35,10 +35,11 @@ def generate_legal_docs(input: LegalDocsInput) -> LegalDocsOutput:
         Now generate the output for this idea:
         IDEA: {input['idea']}
     """
-    client = create_gemini_client()
+    MODEL, client = create_gemini_client()
 
     response = client.generate_content(
-        prompt,
+        prompt = prompt,
+        model=MODEL,
         generation_config={"temperature": 0.3},
     )
 

@@ -1,13 +1,14 @@
 from fastapi import APIRouter, HTTPException
-from src.agents.branding import generate_branding
+from src.agents.branding import generate_branding, generate_branding_video
 from ..models.branding import BrandingInfoInput, BrandingInfosOutput, BrandingInfoVideoOutput
+from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/api/branding", tags=["branding"])
 
 @router.post("/generate", response_model=BrandingInfosOutput)
-async def generate_branding_documents(input: BrandingInfoInput):
+async def generate_branding_assets(input: BrandingInfoInput):
     """
-    Generate branding documents (logo, tagline, name) for a business idea.
+    Generate branding assets (logo, tagline, name) for a business idea.
     """
     try:
         result = generate_branding(input.idea_string)
@@ -17,21 +18,21 @@ async def generate_branding_documents(input: BrandingInfoInput):
 
 
 @router.post("/generate-video", response_model=BrandingInfoVideoOutput)
-async def generate_branding_video(input: BrandingInfoInput):
+async def generate_branding_video_asset(input: BrandingInfoInput):
     """
     Generate branding video for a business idea.
     """
     try:
-        result = generate_branding(input.idea_string)
-        # For now, return the same branding data with a placeholder video URL
-        # In the future, this could generate an actual video
-        video_result = {
-            "branding": result["branding"],
-            "video_url": None  # Placeholder for future video generation
-        }
-        return BrandingInfoVideoOutput(**video_result)
+        result = generate_branding_video(input.idea_string)
+      
+        return BrandingInfoVideoOutput(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating branding video: {str(e)}")
+
+VIDEO_PATH = "branding_video.mp4"
+@router.get("/video")
+def get_video():
+    return FileResponse(VIDEO_PATH, media_type="video/mp4")
     
 @router.get("/health")
 async def health_check():
