@@ -30,7 +30,8 @@ import {
   LogOut,
   ChevronUp,
   Plug,
-  MessageCircle
+  MessageCircle,
+  Globe
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -40,9 +41,7 @@ const navigation = [
     title: 'Main',
     items: [
       { title: 'Dashboard', url: '/dashboard', icon: Home },
-      { title: 'Chat', url: '/chat', icon: MessageCircle },
-      { title: 'Analytics', url: '/analytics', icon: BarChart3 },
-      { title: 'Reports', url: '/reports', icon: FileText },
+      { title: 'Chat', url: '/chat', icon: Globe },
     ],
   },
   {

@@ -27,6 +27,8 @@ You have access to these tools:
 🔍 webSearch - Search the web for real-time information using OpenAI's web search capabilities
 📊 marketSearch - Search for market data, competitor analysis, and industry statistics
 📋 generatePitchDeck - Generate a comprehensive pitch deck with market research, influencer strategy, and professional design
+🎨 generateBranding - Generate branding assets (name, tagline, logo) for a business idea
+🎬 generateBrandingVideo - Generate a branding video for a business idea
 
 When a user asks you to:
 - Set up a store → Use setupStore first, then generateLegalDocs
@@ -40,6 +42,8 @@ When a user asks you to:
 - Search for information on the web → Use webSearch for real-time information
 - Research competitors or market data → Use marketSearch for industry analysis and competitor insights
 - Generate a pitch deck → Use generatePitchDeck for comprehensive investor presentations with market research and influencer strategy
+- Generate branding assets → Use generateBranding for business name, tagline, and logo creation
+- Create a branding video → Use generateBrandingVideo for promotional video content
 
 Always explain what you're doing and show progress. Use the tools in logical sequence and provide clear feedback about each step. If a user mentions a store name, use it in the setupStore tool. Be helpful and proactive in suggesting next steps.
 
@@ -822,6 +826,80 @@ Format as structured JSON with specific color codes and design recommendations.`
                 success: false,
                 status: "error",
                 message: `Failed to generate pitch deck: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
+        },
+        generateBranding: {
+          description: "Generate branding assets (name, tagline, logo) for a business idea",
+          inputSchema: z.object({ 
+            idea: z.string().describe("The business idea or concept to generate branding for")
+          }),
+          execute: async ({ idea }) => {
+            try {
+              const response = await fetch('http://127.0.0.1:8000/api/branding/generate', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ idea_string: idea }),
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              
+              return {
+                success: true,
+                status: "done",
+                branding: data.branding,
+                message: `Successfully generated branding for "${idea}"`
+              };
+            } catch (error) {
+              console.error('Error generating branding:', error);
+              return {
+                success: false,
+                status: "error",
+                message: `Failed to generate branding: ${error instanceof Error ? error.message : 'Unknown error'}`
+              };
+            }
+          }
+        },
+        generateBrandingVideo: {
+          description: "Generate a branding video for a business idea",
+          inputSchema: z.object({ 
+            idea: z.string().describe("The business idea or concept to generate a branding video for")
+          }),
+          execute: async ({ idea }) => {
+            try {
+              const response = await fetch('http://127.0.0.1:8000/api/branding/generate-video', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ idea_string: idea }),
+              });
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+              }
+              
+              const data = await response.json();
+              
+              return {
+                success: true,
+                status: "done",
+                video: data.video,
+                message: `Successfully generated branding video for "${idea}"`
+              };
+            } catch (error) {
+              console.error('Error generating branding video:', error);
+              return {
+                success: false,
+                status: "error",
+                message: `Failed to generate branding video: ${error instanceof Error ? error.message : 'Unknown error'}`
               };
             }
           }

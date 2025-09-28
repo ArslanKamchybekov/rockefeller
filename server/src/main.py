@@ -5,6 +5,7 @@ from src.agents.mail import respond_to_support_email
 from urllib.parse import urlencode
 from .routes.shopify import router as shopify_router
 from .routes.docs import router as docs_router
+from .routes.brand import router as brand_router
 
 # Load environment variables if .env present
 try:
@@ -31,6 +32,7 @@ async def startup_event():
 
 app.include_router(shopify_router)
 app.include_router(docs_router)
+app.include_router(brand_router)
 
 @app.get("/")
 async def root():

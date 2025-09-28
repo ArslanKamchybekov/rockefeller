@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class BrandingInfoInput (BaseModel):
     idea_string : str
@@ -7,4 +8,5 @@ class BrandingInfosOutput (BaseModel):
     branding : dict 
 
 class BrandingInfoVideoOutput (BaseModel):
-    video : bytes
+    branding : dict
+    video_url : Optional[str] = None

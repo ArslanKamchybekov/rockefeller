@@ -28,7 +28,9 @@ const getToolDisplayName = (toolName: string) => {
     deleteAllProducts: 'Deleting all products from your store',
     webSearch: 'Searching the web',
     marketSearch: 'Analyzing market data',
-    generatePitchDeck: 'Generating pitch deck'
+    generatePitchDeck: 'Generating pitch deck',
+    generateBranding: 'Creating branding assets',
+    generateBrandingVideo: 'Generating branding video'
   }
   return displayNames[toolName] || toolName
 }
@@ -44,7 +46,9 @@ const getToolDescription = (toolName: string) => {
     deleteAllProducts: 'Removing all products from your Shopify store',
     webSearch: 'Gathering real-time information from the web',
     marketSearch: 'Researching competitors, trends, and market statistics',
-    generatePitchDeck: 'Creating comprehensive investor presentation with market research and financial models'
+    generatePitchDeck: 'Creating comprehensive investor presentation with market research and financial models',
+    generateBranding: 'Creating business name, tagline, and logo design',
+    generateBrandingVideo: 'Generating promotional video content for your brand'
   }
   return descriptions[toolName] || 'Processing your request...'
 }
