@@ -11,6 +11,7 @@ client = AgentMail(api_key=api_key)
 def email_setup():
     print("Setting up email webhook...")
 
+    client.webhooks.delete_all()
     client.webhooks.create(
         url=f"{ngrok_url}/email/webhook",
         event_types=['message.received'],
