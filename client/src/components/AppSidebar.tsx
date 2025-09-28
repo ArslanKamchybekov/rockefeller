@@ -1,7 +1,6 @@
 'use client'
 
 import { useAuth } from '@/components/AuthProvider'
-import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   Sidebar,

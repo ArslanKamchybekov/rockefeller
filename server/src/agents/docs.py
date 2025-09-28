@@ -43,4 +43,17 @@ def generate_legal_docs(input: LegalDocsInput) -> LegalDocsOutput:
         print(doc['content'])
         print("\n" + "="*60 + "\n")
 
-    return { "docs": response.text }
+    # Clean the response to ensure it's valid JSON
+    cleaned_response = response.text.strip()
+    
+    # Remove markdown code blocks if present
+    if cleaned_response.startswith('```json'):
+        cleaned_response = cleaned_response.replace('```json', '').replace('```', '').strip()
+    elif cleaned_response.startswith('```'):
+        cleaned_response = cleaned_response.replace('```', '').strip()
+    
+    # Remove any leading/trailing backticks
+    import re
+    cleaned_response = re.sub(r'^`+|`+$', '', cleaned_response)
+    
+    return { "docs": cleaned_response }

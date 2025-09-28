@@ -25,6 +25,7 @@ const getToolDisplayName = (toolName: string) => {
     generateDocs: 'Generating legal documents',
     configurePayment: 'Configuring payment methods',
     setupInventory: 'Setting up product inventory',
+    generateLegalDocs: 'Generating comprehensive legal documents',
     // Add more tools as they're added to the system
     analyzeData: 'Analyzing your data',
     createReport: 'Creating business report',
@@ -52,6 +53,7 @@ const getToolDescription = (toolName: string) => {
     generateDocs: 'Generating privacy policy and terms of service',
     configurePayment: 'Setting up payment methods',
     setupInventory: 'Creating sample products and organizing catalog',
+    generateLegalDocs: 'Creating privacy policy, terms of use, and NDA documents',
     analyzeData: 'Processing data to identify trends',
     createReport: 'Compiling business reports and insights',
     optimizeStore: 'Improving performance and user experience',
