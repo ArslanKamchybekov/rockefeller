@@ -75,8 +75,7 @@ def generate_branding (idea_string: str) -> dict:
         image_response_download = requests.get(image_url)
         image_response_download.raise_for_status()
         
-        with open("branding_photo.png", "wb") as f:
-            f.write(image_response_download.content)
+        # No local save; we will upload bytes directly to Supabase Storage
 
         # Upload to Supabase Storage using service role key
         try:
@@ -148,9 +147,29 @@ def generate_branding_video(idea_string: str) -> dict:
             return { "video": False }
 
         generated_video = videos[0]
+        from io import BytesIO
+        video_bytes = None
         try:
-            client.files.download(file=generated_video.video)
-            generated_video.video.save("branding_video.mp4")
+            downloaded = client.files.download(file=generated_video.video)
+            # Handle different SDK return types gracefully
+            if isinstance(downloaded, (bytes, bytearray)):
+                video_bytes = bytes(downloaded)
+            elif hasattr(downloaded, "read"):
+                video_bytes = downloaded.read()
+            elif hasattr(generated_video.video, "bytes"):
+                video_bytes = generated_video.video.bytes  # type: ignore[attr-defined]
+            else:
+                # Last resort: attempt to use .save into an in-memory buffer if supported
+                buffer = BytesIO()
+                if hasattr(generated_video.video, "save"):
+                    try:
+                        generated_video.video.save(buffer)  # type: ignore[call-arg]
+                        buffer.seek(0)
+                        video_bytes = buffer.read()
+                    except Exception:
+                        pass
+            if not video_bytes:
+                raise RuntimeError("Unable to retrieve generated video bytes from Gemini client")
         except Exception as dl_e:
             print(f"Error saving generated video: {dl_e}")
             return { "video": False, "video_url": None }
@@ -167,8 +186,7 @@ def generate_branding_video(idea_string: str) -> dict:
             safe_name = re.sub(r"[^a-z0-9-]", "-", idea_string.strip().lower().replace(" ", "-"))[:60]
             object_key = f"videos/{safe_name}-{uuid.uuid4().hex}.mp4"
 
-            with open("branding_video.mp4", "rb") as vf:
-                video_bytes = vf.read()
+            # video_bytes already populated above
 
             upload_res = sb.storage.from_(bucket_name).upload(
                 path=object_key,

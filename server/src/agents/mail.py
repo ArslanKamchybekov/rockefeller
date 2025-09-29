@@ -28,10 +28,9 @@ def respond_to_support_email(body):
         Please draft a polite and helpful response addressing their concerns. Keep the response concise and professional.
     """
 
-    gemini_client = create_gemini_client()
-    response = gemini_client.generate_content(
-        prompt,
-        generation_config={"temperature": 0.5},
+    MODEL, gemini_client = create_gemini_client()
+    response = gemini_client.models.generate_content(
+        prompt=prompt    
     )
 
     reply_text = response.text
